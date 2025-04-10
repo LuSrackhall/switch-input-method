@@ -60,7 +60,7 @@ func handleKeyEvent(evChan chan hook.Event) {
 				}
 				// 检查是否是目标按键组合（比如 Option+J）
 				if OPTION == true && ev.Keycode == 36 { // 这里的38需要根据实际观察到的keycode调整
-					go switchInputIfNeeded("com.apple.keylayout.US")
+					go switchInputIfNeeded("com.apple.keylayout.UnicodeHexInput")
 				}
 				// 检查是否是目标按键组合（比如 Option+K）
 				if OPTION == true && ev.Keycode == 37 { // 这里的38需要根据实际观察到的keycode调整
