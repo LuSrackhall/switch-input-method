@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
-	"strings"
 	"sync"
 
 	hook "github.com/robotn/gohook"
@@ -62,7 +60,11 @@ func handleKeyEvent(evChan chan hook.Event) {
 				}
 				// 检查是否是目标按键组合（比如 Option+J）
 				if OPTION == true && ev.Keycode == 36 { // 这里的38需要根据实际观察到的keycode调整
-					go switchInputIfNeeded()
+					go switchInputIfNeeded("com.apple.keylayout.US")
+				}
+				// 检查是否是目标按键组合（比如 Option+K）
+				if OPTION == true && ev.Keycode == 37 { // 这里的38需要根据实际观察到的keycode调整
+					go switchInputIfNeeded("com.apple.inputmethod.SCIM.Shuangpin")
 				}
 				key_down_soundIsRun = true
 			}
@@ -79,23 +81,11 @@ func handleKeyEvent(evChan chan hook.Event) {
 }
 
 // 检查当前输入法并切换
-func switchInputIfNeeded() {
-	homeDir := os.Getenv("HOME")
-	cmd := exec.Command("defaults", "read", homeDir+"/Library/Preferences/com.apple.HIToolbox.plist", "AppleSelectedInputSources")
-	output, err := cmd.Output()
+// * 传入的参数为 可以判断输入法的UUID(或称input method key), 可通过手动切换到你需要的输入法，然后执行 `im-select` 命令获取
+func switchInputIfNeeded(imkey string) {
+	err := exec.Command("./im-select", imkey).Run()
 	if err != nil {
-		fmt.Println("Error reading input source:", err)
+		fmt.Println("切换失败", err)
 		return
-	}
-
-	currentInput := string(output)
-	if !strings.Contains(currentInput, `"KeyboardLayout Name" = ABC`) {
-		err := exec.Command("osascript", "-e",
-			`tell application "System Events" to key code 49 using {control down}`).Run()
-		if err != nil {
-			fmt.Println("Error switching input:", err)
-		} else {
-			fmt.Println("Switched input source.")
-		}
 	}
 }
