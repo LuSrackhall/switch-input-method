@@ -84,7 +84,7 @@ func handleKeyEvent(evChan chan hook.Event) {
 // 检查当前输入法并切换
 // * 传入的参数为 可以判断输入法的UUID(或称input method key), 可通过手动切换到你需要的输入法，然后执行 `im-select` 命令获取
 func switchInputIfNeeded(imkey string) {
-	err := exec.Command("./im-select", imkey).Run()
+	err := exec.Command("im-select", imkey).Run()
 	if err != nil {
 		fmt.Println("切换失败", err)
 		return
