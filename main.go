@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"syscall"
 
 	hook "github.com/robotn/gohook"
 )
@@ -28,11 +29,22 @@ func main() {
 	if len(os.Args) == 1 {
 		// 启动守护进程
 		cmd := exec.Command(os.Args[0], "daemon")
+		// 设置进程属性
+		cmd.Stdin = nil
+		cmd.Stdout = nil
+		cmd.Stderr = nil
+		// 启动时分离进程
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Setsid: true, // 创建新的会话
+		}
+
 		cmd.Start()
+
 		fmt.Printf("程序已在后台启动，进程 PID: %d\n", cmd.Process.Pid)
 		fmt.Println("要结束程序，请执行: kill", cmd.Process.Pid)
 		fmt.Println("----------, 或执行: kill -9", cmd.Process.Pid)
-		os.Exit(0)
+
+		cmd.Process.Release()
 	}
 
 	// 实际的程序逻辑
