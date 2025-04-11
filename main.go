@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"time"
 
 	hook "github.com/robotn/gohook"
 )
@@ -29,15 +30,30 @@ func main() {
 		// 启动守护进程
 		cmd := exec.Command(os.Args[0], "daemon")
 		cmd.Start()
-		fmt.Printf("程序已在后台启动，进程 PID: %d\n", cmd.Process.Pid)
+
+		fmt.Println("快捷键绑定输入法切换程序已启动...")
+		// fmt.Println("所有按键的 keycode 值将被打印出来，以帮助您识别所需的按键组合")
+		fmt.Println("可通过 Ctrl+C 结束当前任务以继续使用终端.")
+		fmt.Println("也可以直接关闭当前终端.")
+		fmt.Println("无论怎样, 都不会影响脚本切换输入法程序的实际功能.")
+		fmt.Printf("因为程序已在后台启动，进程 PID: %d\n", cmd.Process.Pid)
+		fmt.Println("但用kill命令可以结束切换输入法的功能程序.")
 		fmt.Println("要结束程序，请执行: kill", cmd.Process.Pid)
 		fmt.Println("----------, 或执行: kill -9", cmd.Process.Pid)
+		fmt.Println("---")
+		fmt.Println("---")
+		fmt.Println("下方读秒只是为了方便用户判断当前终端是否卡死")
+		time.Sleep(time.Second)
+		// 计时以告知用户当前终端是没有卡死的
+		for i := 0; true; i++ {
+			fmt.Printf("\r-------------- %d 秒...", i)
+			time.Sleep(time.Second)
+		}
 		os.Exit(0)
 	}
 
 	// 实际的程序逻辑
-	fmt.Println("键盘事件监听已启动...")
-	fmt.Println("所有按键的 keycode 值将被打印出来，以帮助您识别所需的按键组合")
+
 	KeyEventListen()
 }
 
