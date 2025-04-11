@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"sync"
 
@@ -20,9 +21,23 @@ var once_stores sync.Once
 var OPTION = false
 
 func main() {
-	fmt.Println("Listening for keyboard events... Press Ctrl+C to exit.")
-	fmt.Println("All keycode values will be printed to help you identify the desired key combination.")
+	// 	fmt.Println("Listening for keyboard events... Press Ctrl+C to exit.")
+	// 	fmt.Println("All keycode values will be printed to help you identify the desired key combination.")
 
+	// 检查是否需要以守护进程方式运行
+	if len(os.Args) == 1 {
+		// 启动守护进程
+		cmd := exec.Command(os.Args[0], "daemon")
+		cmd.Start()
+		fmt.Printf("程序已在后台启动，进程 PID: %d\n", cmd.Process.Pid)
+		fmt.Println("要结束程序，请执行: kill", cmd.Process.Pid)
+		fmt.Println("----------, 或执行: kill -9", cmd.Process.Pid)
+		os.Exit(0)
+	}
+
+	// 实际的程序逻辑
+	fmt.Println("键盘事件监听已启动...")
+	fmt.Println("所有按键的 keycode 值将被打印出来，以帮助您识别所需的按键组合")
 	KeyEventListen()
 }
 
