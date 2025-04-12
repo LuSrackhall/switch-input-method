@@ -18,7 +18,7 @@ type Store struct {
 
 var Clients_sse_stores sync.Map
 var once_stores sync.Once
-
+var mutex sync.Mutex
 var OPTION = false
 
 func main() {
@@ -90,7 +90,22 @@ func handleKeyEvent(evChan chan hook.Event) {
 				// 检查是否是目标按键组合（比如 Option+K）
 				if OPTION == true && ev.Keycode == 37 { // 这里的38需要根据实际观察到的keycode调整
 					// go switchInputIfNeeded("com.apple.inputmethod.SCIM.Shuangpin")
-					go switchInputIfNeeded("im.rime.inputmethod.Squirrel.Hans")
+					// go switchInputIfNeeded("im.rime.inputmethod.Squirrel.Hans")
+
+					go func() {
+						switchInputIfNeeded("im.rime.inputmethod.Squirrel.Hans")
+						if !mutex.TryLock() {
+							// 锁可以保证鼠标回到原有位置
+							fmt.Println("锁被占用，放弃执行")
+							return
+						}
+						err := exec.Command("swift", "/Users/srackhalllu/Desktop/资源管理器/safe/输入法按键绑定脚本/focus-shift.swift").Run()
+						if err != nil {
+							fmt.Println("焦点转移失败", err)
+							return
+						}
+						mutex.Unlock()
+					}()
 				}
 				key_down_soundIsRun = true
 			}
