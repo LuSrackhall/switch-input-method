@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"sync"
 	"syscall"
+	"time"
 
 	hook "github.com/robotn/gohook"
 )
@@ -45,6 +46,16 @@ func main() {
 		fmt.Println("----------, 或执行: kill -9", cmd.Process.Pid)
 
 		cmd.Process.Release()
+
+		fmt.Println("---")
+		fmt.Println("---")
+		fmt.Println("下方读秒只是为了方便用户判断当前终端是否卡死, 但主要功能是防止主要逻辑被重复执行")
+		time.Sleep(time.Second)
+		// 计时以告知用户当前终端是没有卡死的
+		for i := 0; true; i++ {
+			fmt.Printf("\r-------------- %d 秒...", i)
+			time.Sleep(time.Second)
+		}
 	}
 
 	// 实际的程序逻辑
@@ -99,7 +110,7 @@ func handleKeyEvent(evChan chan hook.Event) {
 							fmt.Println("锁被占用，放弃执行")
 							return
 						}
-						err := exec.Command("swift", "/Users/srackhalllu/Desktop/资源管理器/safe/输入法按键绑定脚本/focus-shift.swift").Run()
+						err := exec.Command("/Users/srackhalllu/Desktop/资源管理器/safe/输入法按键绑定脚本/focus-shift").Run()
 						if err != nil {
 							fmt.Println("焦点转移失败", err)
 							return
