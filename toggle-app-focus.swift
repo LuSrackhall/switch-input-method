@@ -13,7 +13,7 @@ class StatusBarController: NSObject, NSApplicationDelegate {
         window.isOpaque = false
         window.level = .screenSaver
         window.hasShadow = true
-        window.alphaValue = 0
+        window.alphaValue = 1.0  // 设置固定透明度为1.0
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
         window.titleVisibility = .hidden
@@ -89,25 +89,15 @@ class StatusBarController: NSObject, NSApplicationDelegate {
         
         // 显示窗口并确保焦点
         window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true) // 激活应用程序
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { // 减少延迟时间
+        NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             window.makeFirstResponder(textField)
             textField.becomeFirstResponder()
-            // 调试：验证焦点状态
-            print("TextField is first responder: \(window.firstResponder == textField)")
         }
         
-        // 淡入动画
-        window.animator().alphaValue = 1.0
-        
-        // 自动关闭
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { // 减少延迟时间
-            NSAnimationContext.runAnimationGroup({ context in
-                context.duration = 0.1 // 减少动画持续时间
-                window.animator().alphaValue = 0
-            }, completionHandler: {
-                NSApplication.shared.terminate(nil)
-            })
+        // 延迟关闭
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            NSApplication.shared.terminate(nil)
         }
     }
 }
@@ -117,5 +107,5 @@ NSApp.setActivationPolicy(.regular)
 NSApp.activate(ignoringOtherApps: true) // 确保应用启动时激活
 let controller = StatusBarController()
 app.delegate = controller
-// Thread.sleep(forTimeInterval: 8.0)
+// Thread.sleep(forTimeInterval: 8.0) . // 这行注释很重要, 可以协助调试
 app.run()
