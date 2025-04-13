@@ -70,15 +70,15 @@ class StatusBarController: NSObject, NSApplicationDelegate {
         // 显示窗口并确保焦点
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        // DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             window.makeFirstResponder(textField)
             textField.becomeFirstResponder()
-        }
+        // }
         
         // 延迟关闭
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+        // DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
             NSApplication.shared.terminate(nil)
-        }
+        // }
     }
 }
 
