@@ -2,41 +2,120 @@ import Cocoa
 
 class StatusBarController: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // 创建临时状态栏项
-        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100),
+            styleMask: [.titled, .closable, .texturedBackground],
+            backing: .buffered,
+            defer: false
+        )
         
-        // 创建一个简单的视图控制器
-        let viewController = NSViewController()
+        window.backgroundColor = NSColor(white: 1.0, alpha: 0.95)
+        window.isOpaque = false
+        window.level = .screenSaver
+        window.hasShadow = true
+        window.alphaValue = 0
+        window.titlebarAppearsTransparent = true
+        window.isMovableByWindowBackground = true
+        window.titleVisibility = .hidden
+        
+        let effectView = NSVisualEffectView(frame: window.contentView!.bounds)
+        effectView.material = .popover
+        effectView.state = .active
+        effectView.blendingMode = .withinWindow
+        effectView.wantsLayer = true
+        effectView.layer?.cornerRadius = 12
+        effectView.layer?.masksToBounds = true
+        
         let label = NSTextField(labelWithString: "输入法切换成功")
         label.alignment = .center
-        viewController.view = label
+        label.font = NSFont.systemFont(ofSize: 15, weight: .regular)
+        label.textColor = .labelColor
+        label.backgroundColor = .clear
+        label.isBezeled = false
+        label.isEditable = false
         
-        // 创建弹出窗口
-        let popover = NSPopover()
-        popover.contentViewController = viewController
-        popover.behavior = .transient
+        label.sizeToFit()
+        let labelFrame = NSRect(
+            x: (window.contentView!.bounds.width - label.frame.width) / 2,
+            y: window.contentView!.bounds.height - 35,
+            width: label.frame.width,
+            height: label.frame.height
+        )
+        label.frame = labelFrame
         
-        // 显示弹出窗口
-        if let button = statusItem.button {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            
-            // 添加全局事件监听
-            NSEvent.addGlobalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown]) { _ in
-                popover.close()
-                NSApplication.shared.terminate(nil)
+        // 使用 NSTextField（基于之前的建议）
+        let textField = NSTextField(frame: NSRect(
+            x: 20,
+            y: 15,
+            width: window.contentView!.bounds.width - 40,
+            height: 24
+        ))
+        textField.font = NSFont.systemFont(ofSize: 13)
+        textField.bezelStyle = .roundedBezel
+        textField.isEditable = true
+        textField.isSelectable = true
+        textField.placeholderString = "请输入文本..."
+        
+        class TextFieldDelegate: NSObject, NSTextFieldDelegate {
+            func controlTextDidChange(_ obj: Notification) {
+                print("Text changed: \((obj.object as? NSTextField)?.stringValue ?? "")")
             }
             
-            // 设置自动关闭
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                popover.close()
-                NSApplication.shared.terminate(nil)
+            func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+                if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+                    NSApplication.shared.terminate(nil)
+                    return true
+                }
+                return false
             }
+        }
+        
+        let delegate = TextFieldDelegate()
+        textField.delegate = delegate
+        
+        window.contentView?.addSubview(effectView)
+        window.contentView?.addSubview(label)
+        window.contentView?.addSubview(textField)
+        
+        // 设置初始响应者
+        window.initialFirstResponder = textField
+        
+        // 居中窗口
+        if let screen = NSScreen.main {
+            let x = (screen.frame.width - window.frame.width) / 2
+            let y = (screen.frame.height - window.frame.height) / 2
+            window.setFrameOrigin(NSPoint(x: x, y: y))
+        }
+        
+        // 显示窗口并确保焦点
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true) // 激活应用程序
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { // 减少延迟时间
+            window.makeFirstResponder(textField)
+            textField.becomeFirstResponder()
+            // 调试：验证焦点状态
+            print("TextField is first responder: \(window.firstResponder == textField)")
+        }
+        
+        // 淡入动画
+        window.animator().alphaValue = 1.0
+        
+        // 自动关闭
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { // 减少延迟时间
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.1 // 减少动画持续时间
+                window.animator().alphaValue = 0
+            }, completionHandler: {
+                NSApplication.shared.terminate(nil)
+            })
         }
     }
 }
 
-// 创建并运行应用
 let app = NSApplication.shared
+NSApp.setActivationPolicy(.regular)
+NSApp.activate(ignoringOtherApps: true) // 确保应用启动时激活
 let controller = StatusBarController()
 app.delegate = controller
+// Thread.sleep(forTimeInterval: 8.0)
 app.run()

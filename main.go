@@ -2,11 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"sync"
-	"syscall"
-	"time"
 
 	hook "github.com/robotn/gohook"
 )
@@ -27,36 +24,36 @@ func main() {
 	// 	fmt.Println("All keycode values will be printed to help you identify the desired key combination.")
 
 	// 检查是否需要以守护进程方式运行
-	if len(os.Args) == 1 {
-		// 启动守护进程
-		cmd := exec.Command(os.Args[0], "daemon")
-		// 设置进程属性
-		cmd.Stdin = nil
-		cmd.Stdout = nil
-		cmd.Stderr = nil
-		// 启动时分离进程
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Setsid: true, // 创建新的会话
-		}
+	// if len(os.Args) == 1 {
+	// 	// 启动守护进程
+	// 	cmd := exec.Command(os.Args[0], "daemon")
+	// 	// 设置进程属性
+	// 	cmd.Stdin = nil
+	// 	cmd.Stdout = nil
+	// 	cmd.Stderr = nil
+	// 	// 启动时分离进程
+	// 	cmd.SysProcAttr = &syscall.SysProcAttr{
+	// 		Setsid: true, // 创建新的会话
+	// 	}
 
-		cmd.Start()
+	// 	cmd.Start()
 
-		fmt.Printf("程序已在后台启动，进程 PID: %d\n", cmd.Process.Pid)
-		fmt.Println("要结束程序，请执行: kill", cmd.Process.Pid)
-		fmt.Println("----------, 或执行: kill -9", cmd.Process.Pid)
+	// 	fmt.Printf("程序已在后台启动，进程 PID: %d\n", cmd.Process.Pid)
+	// 	fmt.Println("要结束程序，请执行: kill", cmd.Process.Pid)
+	// 	fmt.Println("----------, 或执行: kill -9", cmd.Process.Pid)
 
-		cmd.Process.Release()
+	// 	cmd.Process.Release()
 
-		fmt.Println("---")
-		fmt.Println("---")
-		fmt.Println("下方读秒只是为了方便用户判断当前终端是否卡死, 但主要功能是防止主要逻辑被重复执行")
-		time.Sleep(time.Second)
-		// 计时以告知用户当前终端是没有卡死的
-		for i := 0; true; i++ {
-			fmt.Printf("\r-------------- %d 秒...", i)
-			time.Sleep(time.Second)
-		}
-	}
+	// 	fmt.Println("---")
+	// 	fmt.Println("---")
+	// 	fmt.Println("下方读秒只是为了方便用户判断当前终端是否卡死, 但主要功能是防止主要逻辑被重复执行")
+	// 	time.Sleep(time.Second)
+	// 	// 计时以告知用户当前终端是没有卡死的
+	// 	for i := 0; true; i++ {
+	// 		fmt.Printf("\r-------------- %d 秒...", i)
+	// 		time.Sleep(time.Second)
+	// 	}
+	// }
 
 	// 实际的程序逻辑
 	KeyEventListen()
@@ -110,7 +107,8 @@ func handleKeyEvent(evChan chan hook.Event) {
 							fmt.Println("锁被占用，放弃执行")
 							return
 						}
-						err := exec.Command("/Users/srackhalllu/Desktop/资源管理器/safe/输入法按键绑定脚本/focus-shift").Run()
+						// err := exec.Command("/Users/srackhalllu/Desktop/资源管理器/safe/输入法按键绑定脚本/focus-shift").Run()
+						err := exec.Command("swift", "/Users/srackhalllu/Desktop/资源管理器/safe/输入法按键绑定脚本/toggle-app-focus.swift").Run()
 						if err != nil {
 							fmt.Println("焦点转移失败", err)
 							return
