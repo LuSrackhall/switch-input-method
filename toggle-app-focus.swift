@@ -3,28 +3,20 @@ import Cocoa
 class StatusBarController: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 200, height: 40), // 减小窗口高度
-            styleMask: [.titled, .closable, .fullSizeContentView],
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 40),
+            styleMask: [.borderless], // 简化窗口样式
             backing: .buffered,
             defer: false
         )
         
         window.backgroundColor = NSColor(white: 1.0, alpha: 0.95)
-        window.isOpaque = false
         window.level = .screenSaver
-        window.hasShadow = true
-        window.alphaValue = 1.0  // 设置固定透明度为1.0
-        window.titlebarAppearsTransparent = true
-        window.isMovableByWindowBackground = true
-        window.titleVisibility = .hidden
+        window.alphaValue = 1.0
         
+        // 简化视觉效果视图
         let effectView = NSVisualEffectView(frame: window.contentView!.bounds)
         effectView.material = .popover
         effectView.state = .active
-        effectView.blendingMode = .withinWindow
-        effectView.wantsLayer = true
-        effectView.layer?.cornerRadius = 12
-        effectView.layer?.masksToBounds = true
         
         // 调整文本框位置和大小
         let textField = NSTextField(frame: NSRect(
@@ -75,17 +67,13 @@ class StatusBarController: NSObject, NSApplicationDelegate {
             textField.becomeFirstResponder()
         // }
         
-        // 延迟关闭
-        // DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
-            NSApplication.shared.terminate(nil)
-        // }
+        textField.becomeFirstResponder()
+        NSApplication.shared.terminate(nil)
     }
 }
 
 let app = NSApplication.shared
-NSApp.setActivationPolicy(.regular)
-NSApp.activate(ignoringOtherApps: true) // 确保应用启动时激活
+NSApp.setActivationPolicy(.accessory) // 使用accessory策略代替regular
 let controller = StatusBarController()
 app.delegate = controller
-// Thread.sleep(forTimeInterval: 8.0) // 这行注释很重要, 可以协助调试
 app.run()
