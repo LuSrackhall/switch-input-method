@@ -1,3 +1,6 @@
+// 运行命令: swift toggle-app-focus.swift 
+// 编译命令: swiftc toggle-app-focus.swift -o toggle-app-focus
+
 import Cocoa
 
 class StatusBarController: NSObject, NSApplicationDelegate {
