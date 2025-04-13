@@ -4,7 +4,7 @@ class StatusBarController: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 200, height: 100),
-            styleMask: [.titled, .closable, .texturedBackground],
+            styleMask: [.titled, .closable, .fullSizeContentView], // 替换废弃的 texturedBackground
             backing: .buffered,
             defer: false
         )
@@ -80,18 +80,59 @@ class StatusBarController: NSObject, NSApplicationDelegate {
         // 设置初始响应者
         window.initialFirstResponder = textField
         
-        // 居中窗口
-        if let screen = NSScreen.main {
-            // 计算窗口在屏幕上的X坐标：
-            // (屏幕宽度 - 窗口宽度) / 2 = 水平居中位置
-            let x = (screen.frame.width - window.frame.width) / 2
+        // 获取当前输入光标位置并设置窗口位置
+        let systemWideElement = AXUIElementCreateSystemWide()
+        var focusedElementRef: CFTypeRef?
+        let focusResult = AXUIElementCopyAttributeValue(
+            systemWideElement,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedElementRef
+        )
+        
+        if focusResult == .success,
+           let focusedElement = focusedElementRef,
+           CFGetTypeID(focusedElement) == AXUIElementGetTypeID() {
+            var positionRef: CFTypeRef?
+            let positionResult = AXUIElementCopyAttributeValue(
+                focusedElement as! AXUIElement,
+                kAXPositionAttribute as CFString,
+                &positionRef
+            )
             
-            // 计算窗口在屏幕上的Y坐标：
-            // (屏幕高度 - 窗口高度) / 2 = 垂直居中位置
-            let y = (screen.frame.height - window.frame.height) / 2
-            
-            // 设置窗口位置到计算出的中心点
-            window.setFrameOrigin(NSPoint(x: x, y: y))
+            if positionResult == .success,
+               let positionValue = positionRef,
+               CFGetTypeID(positionValue) == AXValueGetTypeID() {
+                var point = CGPoint.zero
+                if AXValueGetValue(positionValue as! AXValue, .cgPoint, &point) {
+                    // 获取主屏幕尺寸
+                    if let screen = NSScreen.main {
+                        let screenHeight = screen.frame.height
+                        
+                        // 将AX坐标系转换为Cocoa坐标系
+                        point.y = screenHeight - point.y
+                        
+                        // 根据光标在屏幕上的位置来决定窗口显示位置
+                        let y: CGFloat
+                        if point.y < screenHeight / 2 {
+                            // 如果光标在屏幕下半部分，窗口显示在光标上方
+                            y = point.y + 20
+                        } else {
+                            // 如果光标在屏幕上半部分，窗口显示在光标下方
+                            y = point.y - window.frame.height - 20
+                        }
+                        
+                        window.setFrameOrigin(NSPoint(x: point.x, y: y))
+                    } else {
+                        centerWindow(window)
+                    }
+                } else {
+                    centerWindow(window)
+                }
+            } else {
+                centerWindow(window)
+            }
+        } else {
+            centerWindow(window)
         }
         
         // 显示窗口并确保焦点
@@ -105,6 +146,14 @@ class StatusBarController: NSObject, NSApplicationDelegate {
         // 延迟关闭
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
             NSApplication.shared.terminate(nil)
+        }
+    }
+    
+    private func centerWindow(_ window: NSWindow) {
+        if let screen = NSScreen.main {
+            let x = (screen.frame.width - window.frame.width) / 2
+            let y = (screen.frame.height + window.frame.height) / 2  // 修改这里，使窗口显示在屏幕上半部分
+            window.setFrameOrigin(NSPoint(x: x, y: y))
         }
     }
 }
