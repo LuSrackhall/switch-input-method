@@ -37,7 +37,9 @@ class StatusBarController: NSObject, NSApplicationDelegate {
         textField.bezelStyle = .roundedBezel
         textField.isEditable = true
         textField.isSelectable = true
-        textField.placeholderString = "请输入文本..."
+        textField.placeholderString = "请输入密码..."
+        (textField.cell as? NSSecureTextFieldCell)?.echosBullets = true
+        textField.cell = NSSecureTextFieldCell()  // 设置为密码输入模式
         
         class TextFieldDelegate: NSObject, NSTextFieldDelegate {
             func controlTextDidChange(_ obj: Notification) {
@@ -145,5 +147,5 @@ NSApp.setActivationPolicy(.regular)
 NSApp.activate(ignoringOtherApps: true) // 确保应用启动时激活
 let controller = StatusBarController()
 app.delegate = controller
-// Thread.sleep(forTimeInterval: 8.0) . // 这行注释很重要, 可以协助调试
+Thread.sleep(forTimeInterval: 8.0) // 这行注释很重要, 可以协助调试
 app.run()
