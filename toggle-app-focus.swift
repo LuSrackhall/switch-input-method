@@ -82,8 +82,15 @@ class StatusBarController: NSObject, NSApplicationDelegate {
         
         // 居中窗口
         if let screen = NSScreen.main {
+            // 计算窗口在屏幕上的X坐标：
+            // (屏幕宽度 - 窗口宽度) / 2 = 水平居中位置
             let x = (screen.frame.width - window.frame.width) / 2
+            
+            // 计算窗口在屏幕上的Y坐标：
+            // (屏幕高度 - 窗口高度) / 2 = 垂直居中位置
             let y = (screen.frame.height - window.frame.height) / 2
+            
+            // 设置窗口位置到计算出的中心点
             window.setFrameOrigin(NSPoint(x: x, y: y))
         }
         
@@ -96,7 +103,7 @@ class StatusBarController: NSObject, NSApplicationDelegate {
         }
         
         // 延迟关闭
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
             NSApplication.shared.terminate(nil)
         }
     }
