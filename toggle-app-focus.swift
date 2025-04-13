@@ -3,8 +3,8 @@ import Cocoa
 class StatusBarController: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100),
-            styleMask: [.titled, .closable, .fullSizeContentView], // 替换废弃的 texturedBackground
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 40), // 减小窗口高度
+            styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -26,28 +26,11 @@ class StatusBarController: NSObject, NSApplicationDelegate {
         effectView.layer?.cornerRadius = 12
         effectView.layer?.masksToBounds = true
         
-        let label = NSTextField(labelWithString: "输入法切换成功")
-        label.alignment = .center
-        label.font = NSFont.systemFont(ofSize: 15, weight: .regular)
-        label.textColor = .labelColor
-        label.backgroundColor = .clear
-        label.isBezeled = false
-        label.isEditable = false
-        
-        label.sizeToFit()
-        let labelFrame = NSRect(
-            x: (window.contentView!.bounds.width - label.frame.width) / 2,
-            y: window.contentView!.bounds.height - 35,
-            width: label.frame.width,
-            height: label.frame.height
-        )
-        label.frame = labelFrame
-        
-        // 使用 NSTextField（基于之前的建议）
+        // 调整文本框位置和大小
         let textField = NSTextField(frame: NSRect(
-            x: 20,
-            y: 15,
-            width: window.contentView!.bounds.width - 40,
+            x: 10,
+            y: 8,
+            width: window.contentView!.bounds.width - 20,
             height: 24
         ))
         textField.font = NSFont.systemFont(ofSize: 13)
@@ -74,7 +57,6 @@ class StatusBarController: NSObject, NSApplicationDelegate {
         textField.delegate = delegate
         
         window.contentView?.addSubview(effectView)
-        window.contentView?.addSubview(label)
         window.contentView?.addSubview(textField)
         
         // 设置初始响应者
