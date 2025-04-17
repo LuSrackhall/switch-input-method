@@ -101,24 +101,24 @@ func handleKeyEvent(evChan chan hook.Event) {
 				// 检查是否是目标按键组合（比如 Option+K）
 				if OPTION == true && ev.Keycode == 37 { // 这里的38需要根据实际观察到的keycode调整
 					// go switchInputIfNeeded("com.apple.inputmethod.SCIM.Shuangpin")
-					// go switchInputIfNeeded("im.rime.inputmethod.Squirrel.Hans")
+					go switchInputIfNeeded("im.rime.inputmethod.Squirrel.Hans")
 
-					go func() {
-						switchInputIfNeeded("im.rime.inputmethod.Squirrel.Hans")
-						if !mutex.TryLock() {
-							// 锁可以保证鼠标回到原有位置
-							fmt.Println("锁被占用，放弃执行")
-							return
-						}
-						// err := exec.Command("/Users/srackhalllu/Desktop/资源管理器/safe/输入法按键绑定脚本/focus-shift").Run()
-						// err := exec.Command("swift", "/Users/srackhalllu/Desktop/资源管理器/safe/输入法按键绑定脚本/toggle-app-focus.swift").Run()
-						err := exec.Command("/Users/srackhalllu/Desktop/资源管理器/safe/输入法按键绑定脚本/toggle-app-focus").Run()
-						if err != nil {
-							fmt.Println("焦点转移失败", err)
-							return
-						}
-						mutex.Unlock()
-					}()
+					// go func() {
+					// 	switchInputIfNeeded("im.rime.inputmethod.Squirrel.Hans")
+					// 	if !mutex.TryLock() {
+					// 		// 锁可以保证鼠标回到原有位置
+					// 		fmt.Println("锁被占用，放弃执行")
+					// 		return
+					// 	}
+					// 	// err := exec.Command("/Users/srackhalllu/Desktop/资源管理器/safe/输入法按键绑定脚本/focus-shift").Run()
+					// 	// err := exec.Command("swift", "/Users/srackhalllu/Desktop/资源管理器/safe/输入法按键绑定脚本/toggle-app-focus.swift").Run()
+					// 	err := exec.Command("/Users/srackhalllu/Desktop/资源管理器/safe/输入法按键绑定脚本/toggle-app-focus").Run()
+					// 	if err != nil {
+					// 		fmt.Println("焦点转移失败", err)
+					// 		return
+					// 	}
+					// 	mutex.Unlock()
+					// }()
 				}
 				key_down_soundIsRun = true
 			}
@@ -137,7 +137,7 @@ func handleKeyEvent(evChan chan hook.Event) {
 // 检查当前输入法并切换
 // * 传入的参数为 可以判断输入法的UUID(或称input method key), 可通过手动切换到你需要的输入法，然后执行 `im-select` 命令获取
 func switchInputIfNeeded(imkey string) {
-	err := exec.Command("im-select", imkey).Run()
+	err := exec.Command("ims-mac", imkey).Run()
 	if err != nil {
 		fmt.Println("切换失败", err)
 		return
