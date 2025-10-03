@@ -4,7 +4,9 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -14,6 +16,11 @@ import (
 
 	"golang.org/x/sys/windows"
 )
+
+// 嵌入 im-select.exe 到程序中
+//
+//go:embed im-select.exe
+var imSelectData []byte
 
 var (
 	// 全局互斥锁名称 - 确保单例运行
@@ -28,8 +35,12 @@ func main() {
 	// 检查是否已有实例在运行
 	if !ensureSingleInstance() {
 		fmt.Println("⚠️  程序已在运行中!")
-		fmt.Println("请检查系统托盘图标")
-		fmt.Println("如需退出,请右键托盘图标选择退出")
+		// 使用系统弹窗提示用户
+		ShowMessageBox(
+			"兴宜街道红旗路输入法切换工具",
+			"程序已在运行中！\n\n请检查系统托盘图标。\n如需退出，请右键托盘图标选择退出。",
+			0x30, // MB_ICONWARNING
+		)
 		return
 	}
 
@@ -108,7 +119,14 @@ func switchInputIfNeeded(imkey string) {
 
 	err := cmd.Run()
 	if err != nil {
+		errMsg := fmt.Sprintf("切换输入法失败\n\n错误信息：%v\n\n请确认 im-select.exe 正常工作。", err)
 		fmt.Printf("❌ 切换输入法失败: %v\n", err)
+		// 显示错误弹窗
+		ShowMessageBox(
+			"输入法切换失败",
+			errMsg,
+			0x10, // MB_ICONERROR
+		)
 		return
 	}
 
@@ -122,31 +140,29 @@ func switchInputIfNeeded(imkey string) {
 }
 
 // getIMSelectPath 获取im-select.exe的路径
-// 优先查找与程序同目录的im-select.exe，如果不存在则使用当前工作目录
+// 从嵌入的资源中提取到临时目录
 func getIMSelectPath() string {
-	// 获取当前执行文件的路径
-	exePath, err := os.Executable()
-	if err != nil {
-		// 如果获取失败，使用当前工作目录
-		return "im-select.exe"
-	}
+	// 获取临时目录
+	tempDir := os.TempDir()
+	imSelectPath := filepath.Join(tempDir, "im-select-xingyijiedao.exe")
 
-	// 获取执行文件所在目录
-	exeDir := filepath.Dir(exePath)
-
-	// 构建im-select.exe的完整路径
-	imSelectPath := filepath.Join(exeDir, "im-select.exe")
-
-	// 检查文件是否存在
+	// 检查临时文件是否已存在
 	if _, err := os.Stat(imSelectPath); err == nil {
 		return imSelectPath
 	}
 
-	// 如果同目录不存在，尝试当前工作目录
-	return "im-select.exe"
-}
+	// 从嵌入的数据中提取文件
+	err := ioutil.WriteFile(imSelectPath, imSelectData, 0755)
+	if err != nil {
+		fmt.Printf("❌ 提取 im-select.exe 失败: %v\n", err)
+		// 降级：尝试使用同目录的文件
+		exePath, _ := os.Executable()
+		exeDir := filepath.Dir(exePath)
+		return filepath.Join(exeDir, "im-select.exe")
+	}
 
-// 以下为旧的 gohook 实现，已废弃
+	return imSelectPath
+} // 以下为旧的 gohook 实现，已废弃
 /*
 func KeyEventListen() {
 	evChan := hook.Start()

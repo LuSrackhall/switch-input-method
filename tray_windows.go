@@ -6,6 +6,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"syscall"
+	"unsafe"
 
 	"github.com/getlantern/systray"
 )
@@ -26,7 +28,12 @@ func onReady() {
 	systray.SetTitle("兴宜街道红旗路输入法切换工具")
 	systray.SetTooltip("兴宜街道红旗路输入法切换工具\nWin+J: 英文\nWin+K: 中文")
 
-	// 创建菜单项
+	// 创建菜单项 - 程序名称（置顶显示）
+	mTitle := systray.AddMenuItem("🏷️ 兴宜街道红旗路输入法切换工具", "程序名称")
+	mTitle.Disable()
+
+	systray.AddSeparator()
+
 	mStatus := systray.AddMenuItem("✅ 运行中", "当前状态")
 	mStatus.Disable()
 
@@ -203,4 +210,21 @@ func getIcon() []byte {
 func ShowNotification(title, message string) {
 	// systray 库在 Windows 上会自动显示系统通知
 	log.Printf("通知: %s - %s\n", title, message)
+}
+
+// ShowMessageBox 显示 Windows 消息框
+func ShowMessageBox(title, message string, icon uint) {
+	user32 := syscall.NewLazyDLL("user32.dll")
+	messageBox := user32.NewProc("MessageBoxW")
+
+	titlePtr, _ := syscall.UTF16PtrFromString(title)
+	messagePtr, _ := syscall.UTF16PtrFromString(message)
+
+	// MB_OK = 0, MB_ICONINFORMATION = 0x40, MB_ICONWARNING = 0x30, MB_ICONERROR = 0x10
+	messageBox.Call(
+		uintptr(0),
+		uintptr(unsafe.Pointer(messagePtr)),
+		uintptr(unsafe.Pointer(titlePtr)),
+		uintptr(icon), // icon 已包含样式
+	)
 }
