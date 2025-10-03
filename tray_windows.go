@@ -317,5 +317,37 @@ func reloadConfig() {
 		}
 	}()
 
-	ShowMessageBox("成功", "配置已重新加载\n新的按键绑定已生效", 0x40)
+	// 更新托盘tooltip
+	updateTrayTooltip()
+
+	// 构建成功消息,显示当前所有绑定
+	message := "配置已重新加载!\n\n当前按键绑定:\n\n"
+	config := GetCurrentConfig()
+	if config != nil && len(config.KeyBindings) > 0 {
+		for i, binding := range config.KeyBindings {
+			modifierName := GetKeyName(binding.ModifierKey)
+			functionName := GetKeyName(binding.FunctionKey)
+			message += fmt.Sprintf("%d. %s+%s\n   -> %s\n\n",
+				i+1, modifierName, functionName, binding.Description)
+		}
+	}
+	message += "新的按键绑定已生效!\n\n"
+	message += "注意: 托盘菜单项需要重启程序才能更新,\n"
+	message += "但快捷键已立即生效。"
+
+	ShowMessageBox("配置重新加载成功", message, 0x40)
+}
+
+// updateTrayTooltip 更新托盘提示信息
+func updateTrayTooltip() {
+	tooltipText := "兴宜街道红旗路输入法切换工具\n"
+	config := GetCurrentConfig()
+	if config != nil && len(config.KeyBindings) > 0 {
+		for _, binding := range config.KeyBindings {
+			modifierName := GetKeyName(binding.ModifierKey)
+			functionName := GetKeyName(binding.FunctionKey)
+			tooltipText += fmt.Sprintf("%s+%s: %s\n", modifierName, functionName, binding.Description)
+		}
+	}
+	systray.SetTooltip(tooltipText)
 }

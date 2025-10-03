@@ -54,17 +54,17 @@ type KBDLLHOOKSTRUCT struct {
 	DwExtraInfo uintptr
 }
 
-// 模拟按下并释放 Win 键（用于保持单独 Win 键功能）
-func simulateWinKeyPress(vkCode uint32) {
-	fmt.Printf("模拟 Win 键按下和释放以保持单独 Win 键功能 (VK: %d)\n", vkCode)
-	// 按下 Win 键，使用 dwExtraInfo 标记这是模拟事件
+// 模拟按下并释放修饰键（用于保持单独修饰键功能）
+func simulateModifierKeyPress(vkCode uint32) {
+	fmt.Printf("模拟修饰键 %s 按下和释放以保持单独修饰键功能 (VK: %d)\n", GetKeyName(vkCode), vkCode)
+	// 按下修饰键，使用 dwExtraInfo 标记这是模拟事件
 	procKeybd_event.Call(
 		uintptr(vkCode),
 		0,
 		0,
 		uintptr(SIMULATED_EVENT_MARKER),
 	)
-	// 释放 Win 键，同样标记
+	// 释放修饰键，同样标记
 	procKeybd_event.Call(
 		uintptr(vkCode),
 		0,
@@ -163,8 +163,8 @@ func keyboardHookProc(nCode int, wParam uintptr, lParam uintptr) uintptr {
 				// 否则模拟修饰键按下和释放，以保持单独修饰键功能
 				if wasPressed {
 					fmt.Println("未触发切换操作 - 模拟修饰键事件保持功能")
-					go simulateWinKeyPress(vkCode) // 异步执行，避免阻塞钩子
-					return 1                       // 阻止原始释放事件传递
+					go simulateModifierKeyPress(vkCode) // 异步执行，避免阻塞钩子
+					return 1                            // 阻止原始释放事件传递
 				}
 			}
 		}

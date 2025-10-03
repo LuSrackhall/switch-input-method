@@ -139,46 +139,73 @@ func InitConfig() error {
 // GetKeyName 获取键码对应的名称
 func GetKeyName(vkCode uint32) string {
 	keyNames := map[uint32]string{
-		VK_LWIN: "Left Win",
-		VK_RWIN: "Right Win",
-		VK_J:    "J",
-		VK_K:    "K",
-		0x41:    "A",
-		0x42:    "B",
-		0x43:    "C",
-		0x44:    "D",
-		0x45:    "E",
-		0x46:    "F",
-		0x47:    "G",
-		0x48:    "H",
-		0x49:    "I",
-		0x4C:    "L",
-		0x4D:    "M",
-		0x4E:    "N",
-		0x4F:    "O",
-		0x50:    "P",
-		0x51:    "Q",
-		0x52:    "R",
-		0x53:    "S",
-		0x54:    "T",
-		0x55:    "U",
-		0x56:    "V",
-		0x57:    "W",
-		0x58:    "X",
-		0x59:    "Y",
-		0x5A:    "Z",
-		0xA0:    "Left Shift",
-		0xA1:    "Right Shift",
-		0xA2:    "Left Ctrl",
-		0xA3:    "Right Ctrl",
-		0xA4:    "Left Alt",
-		0xA5:    "Right Alt",
+		// 修饰键
+		91:  "Left Win",  // VK_LWIN
+		92:  "Right Win", // VK_RWIN
+		160: "Left Shift",
+		161: "Right Shift",
+		162: "Left Ctrl",
+		163: "Right Ctrl",
+		164: "Left Alt",
+		165: "Right Alt",
+		// 字母键 A-Z (65-90)
+		65: "A",
+		66: "B",
+		67: "C",
+		68: "D",
+		69: "E",
+		70: "F",
+		71: "G",
+		72: "H",
+		73: "I",
+		74: "J",
+		75: "K",
+		76: "L",
+		77: "M",
+		78: "N",
+		79: "O",
+		80: "P",
+		81: "Q",
+		82: "R",
+		83: "S",
+		84: "T",
+		85: "U",
+		86: "V",
+		87: "W",
+		88: "X",
+		89: "Y",
+		90: "Z",
+		// 数字键 0-9 (48-57)
+		48: "0",
+		49: "1",
+		50: "2",
+		51: "3",
+		52: "4",
+		53: "5",
+		54: "6",
+		55: "7",
+		56: "8",
+		57: "9",
+		// 功能键 F1-F12 (112-123)
+		112: "F1",
+		113: "F2",
+		114: "F3",
+		115: "F4",
+		116: "F5",
+		117: "F6",
+		118: "F7",
+		119: "F8",
+		120: "F9",
+		121: "F10",
+		122: "F11",
+		123: "F12",
 	}
 
 	if name, ok := keyNames[vkCode]; ok {
 		return name
 	}
-	return fmt.Sprintf("VK_%X", vkCode)
+	// 使用十进制显示未知键码
+	return fmt.Sprintf("VK_%d", vkCode)
 }
 
 // AddKeyBinding 添加新的按键绑定
