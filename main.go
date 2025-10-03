@@ -13,15 +13,25 @@ func main() {
 	fmt.Println("===========================================")
 	fmt.Println("  输入法快速切换工具 - Windows 版本")
 	fmt.Println("===========================================")
+	fmt.Println("正在初始化系统托盘...")
 
-	// 启动键盘钩子
-	err := StartKeyboardHook()
-	if err != nil {
-		log.Fatal("启动失败:", err)
-	}
+	// 在后台启动键盘钩子
+	go func() {
+		err := StartKeyboardHook()
+		if err != nil {
+			log.Fatal("启动键盘钩子失败:", err)
+		}
+	}()
 
-	// 清理资源
-	defer StopKeyboardHook()
+	// 等待托盘初始化完成后再启动钩子
+	// 这样可以确保托盘图标先出现
+	fmt.Println("程序已在系统托盘中运行")
+	fmt.Println("右键托盘图标可以退出程序")
+
+	// 启动系统托盘(这会阻塞主线程)
+	InitTray()
+
+	// 程序退出时会自动调用 onExit 清理资源
 }
 
 // 切换输入法
