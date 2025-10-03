@@ -1,67 +1,49 @@
+//go:build windows
+// +build windows
+
 package main
 
 import (
 	"fmt"
-	"os"
+	"log"
 	"os/exec"
-	"sync"
-	"syscall"
-	"time"
-
-	hook "github.com/robotn/gohook"
 )
 
-// Store 定义事件存储结构
-type Store struct {
-	Keycode uint16 `json:"keycode"`
-	State   string `json:"state"`
-}
-
-var Clients_sse_stores sync.Map
-var once_stores sync.Once
-var mutex sync.Mutex
-var OPTION = false
-
 func main() {
-	// 	fmt.Println("Listening for keyboard events... Press Ctrl+C to exit.")
-	// 	fmt.Println("All keycode values will be printed to help you identify the desired key combination.")
+	fmt.Println("===========================================")
+	fmt.Println("  输入法快速切换工具 - Windows 版本")
+	fmt.Println("===========================================")
 
-	// 检查是否需要以守护进程方式运行
-	if len(os.Args) == 1 {
-		// 启动守护进程
-		cmd := exec.Command(os.Args[0], "daemon")
-		// 设置进程属性
-		cmd.Stdin = nil
-		cmd.Stdout = nil
-		cmd.Stderr = nil
-		// 启动时分离进程
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Setsid: true, // 创建新的会话
-		}
-
-		cmd.Start()
-
-		fmt.Printf("程序已在后台启动，进程 PID: %d\n", cmd.Process.Pid)
-		fmt.Println("要结束程序，请执行: kill", cmd.Process.Pid)
-		fmt.Println("----------, 或执行: kill -9", cmd.Process.Pid)
-
-		cmd.Process.Release()
-
-		fmt.Println("---")
-		fmt.Println("---")
-		fmt.Println("下方读秒只是为了方便用户判断当前终端是否卡死, 但主要功能是防止主要逻辑被重复执行")
-		time.Sleep(time.Second)
-		// 计时以告知用户当前终端是没有卡死的
-		for i := 0; true; i++ {
-			fmt.Printf("\r-------------- %d 秒...", i)
-			time.Sleep(time.Second)
-		}
+	// 启动键盘钩子
+	err := StartKeyboardHook()
+	if err != nil {
+		log.Fatal("启动失败:", err)
 	}
 
-	// 实际的程序逻辑
-	KeyEventListen()
+	// 清理资源
+	defer StopKeyboardHook()
 }
 
+// 切换输入法
+// * 1033 = 英语(美国), 2052 = 中文(中国)
+func switchInputIfNeeded(imkey string) {
+	err := exec.Command("C:\\Users\\Public\\Downloads\\插件\\vscode插件\\vim插件\\im-select.exe", imkey).Run()
+	if err != nil {
+		fmt.Printf("❌ 切换输入法失败: %v\n", err)
+		return
+	}
+
+	inputMethodName := "未知"
+	if imkey == "1033" {
+		inputMethodName = "英文"
+	} else if imkey == "2052" {
+		inputMethodName = "中文"
+	}
+	fmt.Printf("✅ 已切换到%s输入法\n", inputMethodName)
+}
+
+// 以下为旧的 gohook 实现，已废弃
+/*
 func KeyEventListen() {
 	evChan := hook.Start()
 	defer hook.End()
@@ -91,17 +73,17 @@ func handleKeyEvent(evChan chan hook.Event) {
 		if ev.Kind == 4 { // KeyHold
 			if !key_down_soundIsRun {
 				fmt.Printf("\nKeyHold - Keycode: %d\n", ev.Keycode)
-				if ev.Keycode == 56 {
+				if ev.Keycode == 3675 {
 					OPTION = true
 				}
 				// 检查是否是目标按键组合（比如 Option+J）
 				if OPTION == true && ev.Keycode == 36 { // 这里的38需要根据实际观察到的keycode调整
-					go switchInputIfNeeded("com.apple.keylayout.UnicodeHexInput")
+					go switchInputIfNeeded("1033")
 				}
 				// 检查是否是目标按键组合（比如 Option+K）
 				if OPTION == true && ev.Keycode == 37 { // 这里的38需要根据实际观察到的keycode调整
 					// go switchInputIfNeeded("com.apple.inputmethod.SCIM.Shuangpin")
-					go switchInputIfNeeded("im.rime.inputmethod.Squirrel.Hans")
+					go switchInputIfNeeded("2052")
 
 					// go func() {
 					// 	switchInputIfNeeded("im.rime.inputmethod.Squirrel.Hans")
@@ -126,7 +108,7 @@ func handleKeyEvent(evChan chan hook.Event) {
 
 		if ev.Kind == 5 { // KeyUp
 			fmt.Printf("\nKeyUp - Keycode: %d\n", ev.Keycode)
-			if ev.Keycode == 56 {
+			if ev.Keycode == 3675 {
 				OPTION = false
 			}
 			key_down_soundIsRun = false
@@ -134,12 +116,13 @@ func handleKeyEvent(evChan chan hook.Event) {
 	}
 }
 
-// 检查当前输入法并切换
-// * 传入的参数为 可以判断输入法的UUID(或称input method key), 可通过手动切换到你需要的输入法，然后执行 `im-select` 命令获取
-func switchInputIfNeeded(imkey string) {
-	err := exec.Command("ims-mac", imkey).Run()
-	if err != nil {
-		fmt.Println("切换失败", err)
-		return
+// setupDaemonProcess 设置 Windows 平台的守护进程属性
+func setupDaemonProcess(cmd *exec.Cmd) {
+	// Windows 平台使用 CREATE_NEW_PROCESS_GROUP 和 DETACHED_PROCESS 标志
+	// 来创建独立的后台进程
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP | 0x00000008, // DETACHED_PROCESS
 	}
 }
+*/
