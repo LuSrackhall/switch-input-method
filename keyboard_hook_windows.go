@@ -21,10 +21,10 @@ var (
 	procGetAsyncKeyState    = user32.NewProc("GetAsyncKeyState")
 	procKeybd_event         = user32.NewProc("keybd_event")
 
-	keyboardHook    windows.Handle
-	winKeyPressed   bool
-	switchMutex     sync.Mutex
-	switchTriggered bool // 标志：是否触发了输入法切换
+	keyboardHook      windows.Handle
+	modifierKeyStates map[uint32]bool // 修饰键状态映射
+	switchMutex       sync.Mutex
+	switchTriggered   bool // 标志：是否触发了输入法切换
 )
 
 const (
@@ -90,50 +90,69 @@ func keyboardHookProc(nCode int, wParam uintptr, lParam uintptr) uintptr {
 			return ret
 		}
 
-		// 检测 Win 键状态
+		// 获取当前配置
+		config := GetCurrentConfig()
+		if config == nil {
+			// 如果配置未初始化，直接传递事件
+			ret, _, _ := procCallNextHookEx.Call(
+				uintptr(keyboardHook),
+				uintptr(nCode),
+				wParam,
+				lParam,
+			)
+			return ret
+		}
+
+		// 收集所有可能的修饰键
+		allModifierKeys := make(map[uint32]bool)
+		for _, binding := range config.KeyBindings {
+			allModifierKeys[binding.ModifierKey] = true
+		}
+
+		// 检测修饰键按下
 		if wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN {
-			if vkCode == VK_LWIN || vkCode == VK_RWIN {
-				winKeyPressed = true
+			if _, isModifier := allModifierKeys[vkCode]; isModifier {
+				if modifierKeyStates == nil {
+					modifierKeyStates = make(map[uint32]bool)
+				}
+				modifierKeyStates[vkCode] = true
 				switchTriggered = false // 重置切换标志
-				fmt.Println("Win 键按下 - 阻止传递")
-				return 1 // 默认阻止 Win 按下事件的传递
+				fmt.Printf("修饰键 %s 按下 - 阻止传递\n", GetKeyName(vkCode))
+				return 1 // 阻止修饰键按下事件的传递
 			}
 
-			// 检测 Win+J (切换到英文)
-			if winKeyPressed && vkCode == VK_J {
-				fmt.Println("检测到 Win+J，切换到英文输入法")
-				switchTriggered = true // 标记已触发切换
-				go func() {
-					switchMutex.Lock()
-					defer switchMutex.Unlock()
-					switchInputIfNeeded("1033")
-				}()
-				// 返回 1 阻止事件传递给系统
-				return 1
-			}
+			// 检测按键组合是否匹配配置
+			for _, binding := range config.KeyBindings {
+				if modifierKeyStates[binding.ModifierKey] && vkCode == binding.FunctionKey {
+					fmt.Printf("检测到 %s+%s，切换到 %s\n",
+						GetKeyName(binding.ModifierKey),
+						GetKeyName(binding.FunctionKey),
+						binding.Description)
+					switchTriggered = true // 标记已触发切换
 
-			// 检测 Win+K (切换到中文)
-			if winKeyPressed && vkCode == VK_K {
-				fmt.Println("检测到 Win+K，切换到中文输入法")
-				switchTriggered = true // 标记已触发切换
-				go func() {
-					switchMutex.Lock()
-					defer switchMutex.Unlock()
-					switchInputIfNeeded("2052")
-				}()
-				// 返回 1 阻止事件传递给系统
-				return 1
+					// 复制 imKey 以避免闭包问题
+					imKey := binding.IMKey
+					go func() {
+						switchMutex.Lock()
+						defer switchMutex.Unlock()
+						switchInputIfNeeded(imKey)
+					}()
+					// 返回 1 阻止事件传递给系统
+					return 1
+				}
 			}
 		}
 
-		// 检测 Win 键释放
+		// 检测修饰键释放
 		if wParam == WM_KEYUP || wParam == WM_SYSKEYUP {
-			if vkCode == VK_LWIN || vkCode == VK_RWIN {
-				wasPressed := winKeyPressed
+			if _, isModifier := allModifierKeys[vkCode]; isModifier {
+				wasPressed := modifierKeyStates[vkCode]
 				triggered := switchTriggered
-				winKeyPressed = false
+				if modifierKeyStates != nil {
+					modifierKeyStates[vkCode] = false
+				}
 
-				fmt.Printf("Win 键释放 (切换操作: %v)\n", triggered)
+				fmt.Printf("修饰键 %s 释放 (切换操作: %v)\n", GetKeyName(vkCode), triggered)
 
 				// 如果触发了切换操作，不做任何动作（阻止释放事件）
 				if wasPressed && triggered {
@@ -141,9 +160,9 @@ func keyboardHookProc(nCode int, wParam uintptr, lParam uintptr) uintptr {
 					return 1 // 阻止原始释放事件传递
 				}
 
-				// 否则模拟 Win 键按下和释放，以保持单独 Win 键功能
+				// 否则模拟修饰键按下和释放，以保持单独修饰键功能
 				if wasPressed {
-					fmt.Println("未触发切换操作 - 模拟 Win 键事件保持功能")
+					fmt.Println("未触发切换操作 - 模拟修饰键事件保持功能")
 					go simulateWinKeyPress(vkCode) // 异步执行，避免阻塞钩子
 					return 1                       // 阻止原始释放事件传递
 				}
@@ -164,9 +183,21 @@ func keyboardHookProc(nCode int, wParam uintptr, lParam uintptr) uintptr {
 // 启动键盘钩子
 func StartKeyboardHook() error {
 	fmt.Println("正在安装键盘钩子...")
-	fmt.Println("快捷键设置:")
-	fmt.Println("  Win+J - 切换到英文输入法 (1033)")
-	fmt.Println("  Win+K - 切换到中文输入法 (2052)")
+
+	// 显示当前配置的快捷键
+	config := GetCurrentConfig()
+	if config != nil && len(config.KeyBindings) > 0 {
+		fmt.Println("快捷键设置:")
+		for _, binding := range config.KeyBindings {
+			modifierName := GetKeyName(binding.ModifierKey)
+			functionName := GetKeyName(binding.FunctionKey)
+			fmt.Printf("  %s+%s - %s (IMKey: %s)\n",
+				modifierName, functionName, binding.Description, binding.IMKey)
+		}
+	} else {
+		fmt.Println("警告: 未加载配置，使用默认配置")
+	}
+
 	fmt.Println("按 Ctrl+C 退出程序")
 	fmt.Println("----------------------------------------")
 

@@ -44,6 +44,13 @@ func main() {
 		return
 	}
 
+	// 初始化配置
+	fmt.Println("正在加载配置...")
+	if err := InitConfig(); err != nil {
+		fmt.Printf("加载配置失败: %v\n", err)
+		fmt.Println("使用默认配置")
+	}
+
 	fmt.Println("正在初始化系统托盘...")
 
 	// 在后台启动键盘钩子
@@ -102,6 +109,33 @@ func ensureSingleInstance() bool {
 	}
 
 	return true
+}
+
+// GetCurrentInputMethod 获取当前输入法
+func GetCurrentInputMethod() (string, error) {
+	imSelectPath := getIMSelectPath()
+	cmd := exec.Command(imSelectPath)
+
+	// 隐藏控制台窗口
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: 0x08000000, // CREATE_NO_WINDOW
+	}
+
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("获取当前输入法失败: %v", err)
+	}
+
+	// 去除输出中的换行符和空格
+	imKey := string(output)
+	imKey = syscall.UTF16ToString(syscall.StringToUTF16(imKey))
+	// 简单处理：去除空白字符
+	for len(imKey) > 0 && (imKey[len(imKey)-1] == '\n' || imKey[len(imKey)-1] == '\r' || imKey[len(imKey)-1] == ' ') {
+		imKey = imKey[:len(imKey)-1]
+	}
+
+	return imKey, nil
 }
 
 // 切换输入法

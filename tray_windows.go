@@ -26,7 +26,18 @@ func onReady() {
 	// 设置托盘图标和提示
 	systray.SetIcon(getIcon())
 	systray.SetTitle("兴宜街道红旗路输入法切换工具")
-	systray.SetTooltip("兴宜街道红旗路输入法切换工具\nWin+J: 英文\nWin+K: 中文")
+
+	// 动态构建提示文本
+	tooltipText := "兴宜街道红旗路输入法切换工具\n"
+	config := GetCurrentConfig()
+	if config != nil && len(config.KeyBindings) > 0 {
+		for _, binding := range config.KeyBindings {
+			modifierName := GetKeyName(binding.ModifierKey)
+			functionName := GetKeyName(binding.FunctionKey)
+			tooltipText += fmt.Sprintf("%s+%s: %s\n", modifierName, functionName, binding.Description)
+		}
+	}
+	systray.SetTooltip(tooltipText)
 
 	// 创建菜单项 - 程序名称（置顶显示）
 	mTitle := systray.AddMenuItem("🏷️ 兴宜街道红旗路输入法切换工具", "程序名称")
@@ -39,14 +50,37 @@ func onReady() {
 
 	systray.AddSeparator()
 
+	// 配置管理菜单
+	mConfig := systray.AddMenuItem("⚙️ 配置管理", "管理按键绑定")
+	mViewConfig := mConfig.AddSubMenuItem("查看当前配置", "查看按键绑定")
+	mQuickBind := mConfig.AddSubMenuItem("快速绑定当前输入法", "绑定当前输入法到快捷键")
+	mKeyCodeRef := mConfig.AddSubMenuItem("虚拟键码参考", "查看键码对照表")
+	mOpenConfigFile := mConfig.AddSubMenuItem("打开配置文件", "在记事本中打开配置文件")
+	mReloadConfig := mConfig.AddSubMenuItem("重新加载配置", "重新加载配置文件")
+
+	systray.AddSeparator()
+
 	mInfo := systray.AddMenuItem("快捷键说明", "查看快捷键")
 	mInfo.Disable()
 
-	mWinJ := systray.AddMenuItem("  Win+J - 英文输入法", "切换到英文")
-	mWinJ.Disable()
+	// 动态显示当前按键绑定
+	config = GetCurrentConfig()
+	if config != nil {
+		for _, binding := range config.KeyBindings {
+			modifierName := GetKeyName(binding.ModifierKey)
+			functionName := GetKeyName(binding.FunctionKey)
+			menuText := fmt.Sprintf("  %s+%s - %s", modifierName, functionName, binding.Description)
+			menuItem := systray.AddMenuItem(menuText, binding.Description)
+			menuItem.Disable()
+		}
+	} else {
+		// 默认显示
+		mWinJ := systray.AddMenuItem("  Win+J - 英文输入法", "切换到英文")
+		mWinJ.Disable()
 
-	mWinK := systray.AddMenuItem("  Win+K - 中文输入法", "切换到中文")
-	mWinK.Disable()
+		mWinK := systray.AddMenuItem("  Win+K - 中文输入法", "切换到中文")
+		mWinK.Disable()
+	}
 
 	systray.AddSeparator()
 
@@ -57,10 +91,23 @@ func onReady() {
 
 	// 处理菜单点击事件
 	go func() {
-		for range mQuit.ClickedCh {
-			fmt.Println("用户从托盘退出程序")
-			systray.Quit()
-			return
+		for {
+			select {
+			case <-mViewConfig.ClickedCh:
+				ShowConfigDialog()
+			case <-mQuickBind.ClickedCh:
+				ShowQuickBindingMenu()
+			case <-mKeyCodeRef.ClickedCh:
+				ShowKeyCodeReference()
+			case <-mOpenConfigFile.ClickedCh:
+				openConfigFile()
+			case <-mReloadConfig.ClickedCh:
+				reloadConfig()
+			case <-mQuit.ClickedCh:
+				fmt.Println("用户从托盘退出程序")
+				systray.Quit()
+				return
+			}
 		}
 	}()
 }
@@ -227,4 +274,48 @@ func ShowMessageBox(title, message string, icon uint) {
 		uintptr(unsafe.Pointer(titlePtr)),
 		uintptr(icon), // icon 已包含样式
 	)
+}
+
+// openConfigFile 在记事本中打开配置文件
+func openConfigFile() {
+	configPath := GetConfigPath()
+	shell32 := syscall.NewLazyDLL("shell32.dll")
+	shellExecute := shell32.NewProc("ShellExecuteW")
+
+	operation, _ := syscall.UTF16PtrFromString("open")
+	file, _ := syscall.UTF16PtrFromString("notepad.exe")
+	params, _ := syscall.UTF16PtrFromString(configPath)
+
+	ret, _, _ := shellExecute.Call(
+		0,
+		uintptr(unsafe.Pointer(operation)),
+		uintptr(unsafe.Pointer(file)),
+		uintptr(unsafe.Pointer(params)),
+		0,
+		1, // SW_SHOWNORMAL
+	)
+
+	if ret <= 32 {
+		ShowMessageBox("错误", fmt.Sprintf("无法打开配置文件\n路径: %s", configPath), 0x10)
+	}
+}
+
+// reloadConfig 重新加载配置
+func reloadConfig() {
+	err := InitConfig()
+	if err != nil {
+		ShowMessageBox("错误", fmt.Sprintf("重新加载配置失败:\n%v", err), 0x10)
+		return
+	}
+
+	// 重新启动键盘钩子以应用新配置
+	StopKeyboardHook()
+	go func() {
+		err := StartKeyboardHook()
+		if err != nil {
+			log.Fatal("重启键盘钩子失败:", err)
+		}
+	}()
+
+	ShowMessageBox("成功", "配置已重新加载\n新的按键绑定已生效", 0x40)
 }
