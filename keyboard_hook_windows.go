@@ -19,7 +19,6 @@ var (
 	procUnhookWindowsHookEx = user32.NewProc("UnhookWindowsHookEx")
 	procGetMessage          = user32.NewProc("GetMessageW")
 	procGetAsyncKeyState    = user32.NewProc("GetAsyncKeyState")
-	procSendInput           = user32.NewProc("SendInput")
 
 	keyboardHook    windows.Handle
 	winKeyPressed   bool
@@ -34,14 +33,10 @@ const (
 	WM_SYSKEYDOWN  = 0x0104
 	WM_SYSKEYUP    = 0x0105
 
-	VK_LWIN   = 0x5B // 左 Win 键
-	VK_RWIN   = 0x5C // 右 Win 键
-	VK_J      = 0x4A // J 键
-	VK_K      = 0x4B // K 键
-	VK_ESCAPE = 0x1B // Escape 键
-
-	INPUT_KEYBOARD  = 1
-	KEYEVENTF_KEYUP = 0x0002
+	VK_LWIN = 0x5B // 左 Win 键
+	VK_RWIN = 0x5C // 右 Win 键
+	VK_J    = 0x4A // J 键
+	VK_K    = 0x4B // K 键
 )
 
 // KBDLLHOOKSTRUCT 键盘钩子结构
@@ -51,55 +46,6 @@ type KBDLLHOOKSTRUCT struct {
 	Flags       uint32
 	Time        uint32
 	DwExtraInfo uintptr
-}
-
-// KEYBDINPUT 键盘输入结构
-type KEYBDINPUT struct {
-	WVk         uint16
-	WScan       uint16
-	DwFlags     uint32
-	Time        uint32
-	DwExtraInfo uintptr
-	Unused      [8]byte
-}
-
-// INPUT 输入结构
-type INPUT struct {
-	Type uint32
-	Ki   KEYBDINPUT
-}
-
-// sendEscapeKey 发送 Escape 键来取消开始菜单
-func sendEscapeKey() {
-	// 按下 Escape
-	inputDown := INPUT{
-		Type: INPUT_KEYBOARD,
-		Ki: KEYBDINPUT{
-			WVk:     VK_ESCAPE,
-			WScan:   0,
-			DwFlags: 0,
-			Time:    0,
-		},
-	}
-
-	// 释放 Escape
-	inputUp := INPUT{
-		Type: INPUT_KEYBOARD,
-		Ki: KEYBDINPUT{
-			WVk:     VK_ESCAPE,
-			WScan:   0,
-			DwFlags: KEYEVENTF_KEYUP,
-			Time:    0,
-		},
-	}
-
-	inputs := []INPUT{inputDown, inputUp}
-	procSendInput.Call(
-		uintptr(2),
-		uintptr(unsafe.Pointer(&inputs[0])),
-		uintptr(unsafe.Sizeof(INPUT{})),
-	)
-	fmt.Println("发送 Escape 键取消开始菜单")
 }
 
 // 键盘钩子回调函数
@@ -152,13 +98,12 @@ func keyboardHookProc(nCode int, wParam uintptr, lParam uintptr) uintptr {
 
 				fmt.Printf("Win 键释放 (切换操作: %v)\n", triggered)
 
-				// 如果触发了切换操作,让释放事件正常传递,然后发送 Escape 取消开始菜单
+				// 如果触发了切换操作，阻止 Win 键释放事件传递给系统
 				if wasPressed && triggered {
-					fmt.Println("发送 Escape 键取消开始菜单")
-					// 在 goroutine 中发送 Escape,避免阻塞钩子回调
-					go sendEscapeKey()
+					fmt.Println("阻止 Win 键释放事件传递（避免弹出开始菜单）")
+					return 1 // 阻止传递
 				}
-				// Win 键释放事件正常传递给系统
+				// 否则正常传递，允许系统处理（如弹出开始菜单）
 			}
 		}
 	}
