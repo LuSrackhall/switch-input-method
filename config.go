@@ -82,9 +82,30 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("读取配置文件失败: %v", err)
 	}
 
+	// 过滤掉注释行(以 // 开头的行)
+	lines := []byte{}
+	inComment := false
+	for i := 0; i < len(data); i++ {
+		// 检查是否是注释开始
+		if i < len(data)-1 && data[i] == '/' && data[i+1] == '/' {
+			inComment = true
+		}
+		// 如果不在注释中,添加字符
+		if !inComment {
+			lines = append(lines, data[i])
+		}
+		// 换行符表示注释结束
+		if data[i] == '\n' {
+			inComment = false
+			if len(lines) > 0 && lines[len(lines)-1] != '\n' {
+				lines = append(lines, '\n')
+			}
+		}
+	}
+
 	// 解析配置
 	var config Config
-	if err := json.Unmarshal(data, &config); err != nil {
+	if err := json.Unmarshal(lines, &config); err != nil {
 		return nil, fmt.Errorf("解析配置文件失败: %v", err)
 	}
 
@@ -101,14 +122,46 @@ func LoadConfig() (*Config, error) {
 func SaveConfig(config *Config) error {
 	configPath := GetConfigPath()
 
+	// 构建带注释的配置文件内容
+	var content string
+	content += "// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+	content += "// 兴宜街道红旗路输入法切换工具 - 配置文件\n"
+	content += "// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+	content += "//\n"
+	content += "// 使用说明:\n"
+	content += "// 1. 修改配置后,点击托盘菜单「配置管理」->「重新加载配置」即可生效\n"
+	content += "// 2. 可添加多个按键绑定,每个绑定包含4个字段:\n"
+	content += "//    - modifier_key: 修饰键(如Win、Ctrl、Alt等)\n"
+	content += "//    - function_key: 功能键(如字母、数字、F键等)\n"
+	content += "//    - im_key: 输入法标识(使用im-select.exe获取)\n"
+	content += "//    - description: 描述说明\n"
+	content += "//\n"
+	content += "// 常用键码参考(十进制):\n"
+	content += "//   修饰键: Win=91, Ctrl=162, Alt=164, Shift=160\n"
+	content += "//   字母键: A=65, B=66, ..., Z=90\n"
+	content += "//   数字键: 0=48, 1=49, ..., 9=57\n"
+	content += "//   功能键: F1=112, F2=113, ..., F12=123\n"
+	content += "//\n"
+	content += "// 获取当前输入法标识:\n"
+	content += "//   运行: im-select.exe\n"
+	content += "//   或点击托盘菜单「配置管理」->「快速绑定当前输入法」\n"
+	content += "//\n"
+	content += "// 完整键码参考:\n"
+	content += "//   https://learn.microsoft.com/windows/win32/inputdev/virtual-key-codes\n"
+	content += "//\n"
+	content += "// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
 	// 序列化配置
 	data, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return fmt.Errorf("序列化配置失败: %v", err)
 	}
 
+	// 合并注释和配置内容
+	fullContent := content + string(data) + "\n"
+
 	// 写入文件
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(fullContent), 0644); err != nil {
 		return fmt.Errorf("写入配置文件失败: %v", err)
 	}
 

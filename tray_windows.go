@@ -16,6 +16,8 @@ var (
 	trayReady = make(chan bool)
 	// 存储动态菜单项引用
 	keyBindingMenuItems []*systray.MenuItem
+	// 存储按键绑定父菜单引用
+	mKeyBindings *systray.MenuItem
 )
 
 // InitTray 初始化系统托盘
@@ -63,9 +65,8 @@ func onReady() {
 
 	systray.AddSeparator()
 
-	mInfo := systray.AddMenuItem("快捷键说明", "查看快捷键")
-	mInfo.Disable()
-
+	// 按键绑定列表菜单
+	mKeyBindings = systray.AddMenuItem("⌨️ 当前按键绑定", "查看当前按键绑定")
 	// 初始化动态显示当前按键绑定
 	updateKeyBindingMenuItems()
 
@@ -305,6 +306,10 @@ func updateTrayTooltip() {
 
 // updateKeyBindingMenuItems 更新或创建按键绑定菜单项
 func updateKeyBindingMenuItems() {
+	if mKeyBindings == nil {
+		return // 菜单尚未初始化
+	}
+
 	config := GetCurrentConfig()
 
 	// 如果已有菜单项,先移除它们
@@ -313,23 +318,23 @@ func updateKeyBindingMenuItems() {
 	}
 	keyBindingMenuItems = nil
 
-	// 创建新的菜单项
+	// 在子菜单中创建新的菜单项
 	if config != nil && len(config.KeyBindings) > 0 {
 		for _, binding := range config.KeyBindings {
 			modifierName := GetKeyName(binding.ModifierKey)
 			functionName := GetKeyName(binding.FunctionKey)
-			menuText := fmt.Sprintf("  %s+%s - %s", modifierName, functionName, binding.Description)
-			menuItem := systray.AddMenuItem(menuText, binding.Description)
+			menuText := fmt.Sprintf("%s+%s - %s", modifierName, functionName, binding.Description)
+			menuItem := mKeyBindings.AddSubMenuItem(menuText, binding.Description)
 			menuItem.Disable()
 			keyBindingMenuItems = append(keyBindingMenuItems, menuItem)
 		}
 	} else {
 		// 默认显示
-		mWinJ := systray.AddMenuItem("  Win+J - 英文输入法", "切换到英文")
+		mWinJ := mKeyBindings.AddSubMenuItem("Win+J - 英文输入法", "切换到英文")
 		mWinJ.Disable()
 		keyBindingMenuItems = append(keyBindingMenuItems, mWinJ)
 
-		mWinK := systray.AddMenuItem("  Win+K - 中文输入法", "切换到中文")
+		mWinK := mKeyBindings.AddSubMenuItem("Win+K - 中文输入法", "切换到中文")
 		mWinK.Disable()
 		keyBindingMenuItems = append(keyBindingMenuItems, mWinK)
 	}
