@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"syscall"
 )
 
 func main() {
@@ -37,7 +38,15 @@ func main() {
 // 切换输入法
 // * 1033 = 英语(美国), 2052 = 中文(中国)
 func switchInputIfNeeded(imkey string) {
-	err := exec.Command("C:\\Users\\Public\\Downloads\\插件\\vscode插件\\vim插件\\im-select.exe", imkey).Run()
+	cmd := exec.Command("C:\\Users\\Public\\Downloads\\插件\\vscode插件\\vim插件\\im-select.exe", imkey)
+
+	// 隐藏控制台窗口 - 这是关键!
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: 0x08000000, // CREATE_NO_WINDOW
+	}
+
+	err := cmd.Run()
 	if err != nil {
 		fmt.Printf("❌ 切换输入法失败: %v\n", err)
 		return
