@@ -20,9 +20,10 @@ var (
 	procGetMessage          = user32.NewProc("GetMessageW")
 	procGetAsyncKeyState    = user32.NewProc("GetAsyncKeyState")
 
-	keyboardHook  windows.Handle
-	winKeyPressed bool
-	switchMutex   sync.Mutex
+	keyboardHook    windows.Handle
+	winKeyPressed   bool
+	switchMutex     sync.Mutex
+	switchTriggered bool // 标志：是否触发了输入法切换
 )
 
 const (
@@ -57,12 +58,14 @@ func keyboardHookProc(nCode int, wParam uintptr, lParam uintptr) uintptr {
 		if wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN {
 			if vkCode == VK_LWIN || vkCode == VK_RWIN {
 				winKeyPressed = true
+				switchTriggered = false // 重置切换标志
 				fmt.Println("Win 键按下")
 			}
 
 			// 检测 Win+J (切换到英文)
 			if winKeyPressed && vkCode == VK_J {
 				fmt.Println("检测到 Win+J，切换到英文输入法")
+				switchTriggered = true // 标记已触发切换
 				go func() {
 					switchMutex.Lock()
 					defer switchMutex.Unlock()
@@ -75,6 +78,7 @@ func keyboardHookProc(nCode int, wParam uintptr, lParam uintptr) uintptr {
 			// 检测 Win+K (切换到中文)
 			if winKeyPressed && vkCode == VK_K {
 				fmt.Println("检测到 Win+K，切换到中文输入法")
+				switchTriggered = true // 标记已触发切换
 				go func() {
 					switchMutex.Lock()
 					defer switchMutex.Unlock()
@@ -88,8 +92,18 @@ func keyboardHookProc(nCode int, wParam uintptr, lParam uintptr) uintptr {
 		// 检测 Win 键释放
 		if wParam == WM_KEYUP || wParam == WM_SYSKEYUP {
 			if vkCode == VK_LWIN || vkCode == VK_RWIN {
+				wasPressed := winKeyPressed
+				triggered := switchTriggered
 				winKeyPressed = false
-				fmt.Println("Win 键释放")
+
+				fmt.Printf("Win 键释放 (切换操作: %v)\n", triggered)
+
+				// 如果触发了切换操作，阻止 Win 键释放事件传递给系统
+				if wasPressed && triggered {
+					fmt.Println("阻止 Win 键释放事件传递（避免弹出开始菜单）")
+					return 1 // 阻止传递
+				}
+				// 否则正常传递，允许系统处理（如弹出开始菜单）
 			}
 		}
 	}
