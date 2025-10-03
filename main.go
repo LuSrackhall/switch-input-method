@@ -6,14 +6,33 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"syscall"
+	"unsafe"
+
+	"golang.org/x/sys/windows"
+)
+
+var (
+	// 全局互斥锁名称 - 确保单例运行
+	mutexName = "Global\\XingYiStreetHongQiRoadIMESwitcher"
 )
 
 func main() {
 	fmt.Println("===========================================")
-	fmt.Println("  输入法快速切换工具 - Windows 版本")
+	fmt.Println("  兴宜街道红旗路输入法切换工具")
 	fmt.Println("===========================================")
+
+	// 检查是否已有实例在运行
+	if !ensureSingleInstance() {
+		fmt.Println("⚠️  程序已在运行中!")
+		fmt.Println("请检查系统托盘图标")
+		fmt.Println("如需退出,请右键托盘图标选择退出")
+		return
+	}
+
 	fmt.Println("正在初始化系统托盘...")
 
 	// 在后台启动键盘钩子
@@ -35,10 +54,51 @@ func main() {
 	// 程序退出时会自动调用 onExit 清理资源
 }
 
+// ensureSingleInstance 确保程序只运行一个实例
+func ensureSingleInstance() bool {
+	kernel32 := windows.NewLazyDLL("kernel32.dll")
+	procCreateMutex := kernel32.NewProc("CreateMutexW")
+
+	mutexNamePtr, err := windows.UTF16PtrFromString(mutexName)
+	if err != nil {
+		log.Printf("创建互斥锁名称失败: %v", err)
+		return true
+	}
+
+	// 创建互斥锁
+	handle, _, err := procCreateMutex.Call(
+		uintptr(0),
+		uintptr(0),
+		uintptr(unsafe.Pointer(mutexNamePtr)),
+	)
+
+	if handle == 0 {
+		log.Printf("创建互斥锁失败: %v", err)
+		return true
+	}
+
+	// 检查是否已存在
+	if err != nil && err.Error() == "The operation completed successfully." {
+		return true
+	}
+
+	// ERROR_ALREADY_EXISTS = 183
+	if err != nil {
+		errno, ok := err.(syscall.Errno)
+		if ok && errno == 183 {
+			return false // 已有实例在运行
+		}
+	}
+
+	return true
+}
+
 // 切换输入法
 // * 1033 = 英语(美国), 2052 = 中文(中国)
 func switchInputIfNeeded(imkey string) {
-	cmd := exec.Command("C:\\Users\\Public\\Downloads\\插件\\vscode插件\\vim插件\\im-select.exe", imkey)
+	// 获取im-select.exe路径 (与程序同目录)
+	imSelectPath := getIMSelectPath()
+	cmd := exec.Command(imSelectPath, imkey)
 
 	// 隐藏控制台窗口 - 这是关键!
 	cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -59,6 +119,31 @@ func switchInputIfNeeded(imkey string) {
 		inputMethodName = "中文"
 	}
 	fmt.Printf("✅ 已切换到%s输入法\n", inputMethodName)
+}
+
+// getIMSelectPath 获取im-select.exe的路径
+// 优先查找与程序同目录的im-select.exe，如果不存在则使用当前工作目录
+func getIMSelectPath() string {
+	// 获取当前执行文件的路径
+	exePath, err := os.Executable()
+	if err != nil {
+		// 如果获取失败，使用当前工作目录
+		return "im-select.exe"
+	}
+
+	// 获取执行文件所在目录
+	exeDir := filepath.Dir(exePath)
+
+	// 构建im-select.exe的完整路径
+	imSelectPath := filepath.Join(exeDir, "im-select.exe")
+
+	// 检查文件是否存在
+	if _, err := os.Stat(imSelectPath); err == nil {
+		return imSelectPath
+	}
+
+	// 如果同目录不存在，尝试当前工作目录
+	return "im-select.exe"
 }
 
 // 以下为旧的 gohook 实现，已废弃

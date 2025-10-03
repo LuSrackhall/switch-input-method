@@ -23,8 +23,8 @@ func InitTray() {
 func onReady() {
 	// 设置托盘图标和提示
 	systray.SetIcon(getIcon())
-	systray.SetTitle("输入法切换")
-	systray.SetTooltip("输入法快速切换工具\nWin+J: 英文\nWin+K: 中文")
+	systray.SetTitle("兴宜街道红旗路输入法切换工具")
+	systray.SetTooltip("兴宜街道红旗路输入法切换工具\nWin+J: 英文\nWin+K: 中文")
 
 	// 创建菜单项
 	mStatus := systray.AddMenuItem("✅ 运行中", "当前状态")
