@@ -19,6 +19,7 @@ var (
 	procUnhookWindowsHookEx = user32.NewProc("UnhookWindowsHookEx")
 	procGetMessage          = user32.NewProc("GetMessageW")
 	procGetAsyncKeyState    = user32.NewProc("GetAsyncKeyState")
+	procKeybd_event         = user32.NewProc("keybd_event")
 
 	keyboardHook    windows.Handle
 	winKeyPressed   bool
@@ -37,6 +38,8 @@ const (
 	VK_RWIN = 0x5C // 右 Win 键
 	VK_J    = 0x4A // J 键
 	VK_K    = 0x4B // K 键
+
+	KEYEVENTF_KEYUP = 0x0002 // keybd_event 的释放标志
 )
 
 // KBDLLHOOKSTRUCT 键盘钩子结构
@@ -46,6 +49,25 @@ type KBDLLHOOKSTRUCT struct {
 	Flags       uint32
 	Time        uint32
 	DwExtraInfo uintptr
+}
+
+// 模拟按下并释放 Win 键（用于保持单独 Win 键功能）
+func simulateWinKeyPress(vkCode uint32) {
+	fmt.Printf("模拟 Win 键按下和释放以保持单独 Win 键功能 (VK: %d)\n", vkCode)
+	// 按下 Win 键
+	procKeybd_event.Call(
+		uintptr(vkCode),
+		0,
+		0,
+		0,
+	)
+	// 释放 Win 键
+	procKeybd_event.Call(
+		uintptr(vkCode),
+		0,
+		uintptr(KEYEVENTF_KEYUP),
+		0,
+	)
 }
 
 // 键盘钩子回调函数
@@ -59,7 +81,8 @@ func keyboardHookProc(nCode int, wParam uintptr, lParam uintptr) uintptr {
 			if vkCode == VK_LWIN || vkCode == VK_RWIN {
 				winKeyPressed = true
 				switchTriggered = false // 重置切换标志
-				fmt.Println("Win 键按下")
+				fmt.Println("Win 键按下 - 阻止传递")
+				return 1 // 默认阻止 Win 按下事件的传递
 			}
 
 			// 检测 Win+J (切换到英文)
@@ -100,10 +123,11 @@ func keyboardHookProc(nCode int, wParam uintptr, lParam uintptr) uintptr {
 
 				// 如果触发了切换操作，阻止 Win 键释放事件传递给系统
 				if wasPressed && triggered {
-					fmt.Println("阻止 Win 键释放事件传递（避免弹出开始菜单）")
-					return 1 // 阻止传递
+					// return 1 // 阻止原始释放事件传递
+				} else {
+					fmt.Println("未触发切换操作 - 模拟 Win 键事件保持功能")
+					go simulateWinKeyPress(vkCode) // 异步执行，避免阻塞钩子
 				}
-				// 否则正常传递，允许系统处理（如弹出开始菜单）
 			}
 		}
 	}
