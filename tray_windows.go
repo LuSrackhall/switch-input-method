@@ -14,6 +14,8 @@ import (
 
 var (
 	trayReady = make(chan bool)
+	// 存储动态菜单项引用
+	keyBindingMenuItems []*systray.MenuItem
 )
 
 // InitTray 初始化系统托盘
@@ -57,30 +59,15 @@ func onReady() {
 	mKeyCodeRef := mConfig.AddSubMenuItem("虚拟键码参考", "查看键码对照表")
 	mOpenConfigFile := mConfig.AddSubMenuItem("打开配置文件", "在记事本中打开配置文件")
 	mReloadConfig := mConfig.AddSubMenuItem("重新加载配置", "重新加载配置文件")
+	mResetConfig := mConfig.AddSubMenuItem("重置为默认配置", "恢复默认配置")
 
 	systray.AddSeparator()
 
 	mInfo := systray.AddMenuItem("快捷键说明", "查看快捷键")
 	mInfo.Disable()
 
-	// 动态显示当前按键绑定
-	config = GetCurrentConfig()
-	if config != nil {
-		for _, binding := range config.KeyBindings {
-			modifierName := GetKeyName(binding.ModifierKey)
-			functionName := GetKeyName(binding.FunctionKey)
-			menuText := fmt.Sprintf("  %s+%s - %s", modifierName, functionName, binding.Description)
-			menuItem := systray.AddMenuItem(menuText, binding.Description)
-			menuItem.Disable()
-		}
-	} else {
-		// 默认显示
-		mWinJ := systray.AddMenuItem("  Win+J - 英文输入法", "切换到英文")
-		mWinJ.Disable()
-
-		mWinK := systray.AddMenuItem("  Win+K - 中文输入法", "切换到中文")
-		mWinK.Disable()
-	}
+	// 初始化动态显示当前按键绑定
+	updateKeyBindingMenuItems()
 
 	systray.AddSeparator()
 
@@ -102,7 +89,9 @@ func onReady() {
 			case <-mOpenConfigFile.ClickedCh:
 				openConfigFile()
 			case <-mReloadConfig.ClickedCh:
-				reloadConfig()
+				reloadConfigAndUpdateMenu()
+			case <-mResetConfig.ClickedCh:
+				resetConfig()
 			case <-mQuit.ClickedCh:
 				fmt.Println("用户从托盘退出程序")
 				systray.Quit()
@@ -300,8 +289,54 @@ func openConfigFile() {
 	}
 }
 
-// reloadConfig 重新加载配置
-func reloadConfig() {
+// updateTrayTooltip 更新托盘提示信息
+func updateTrayTooltip() {
+	tooltipText := "兴宜街道红旗路输入法切换工具\n"
+	config := GetCurrentConfig()
+	if config != nil && len(config.KeyBindings) > 0 {
+		for _, binding := range config.KeyBindings {
+			modifierName := GetKeyName(binding.ModifierKey)
+			functionName := GetKeyName(binding.FunctionKey)
+			tooltipText += fmt.Sprintf("%s+%s: %s\n", modifierName, functionName, binding.Description)
+		}
+	}
+	systray.SetTooltip(tooltipText)
+}
+
+// updateKeyBindingMenuItems 更新或创建按键绑定菜单项
+func updateKeyBindingMenuItems() {
+	config := GetCurrentConfig()
+
+	// 如果已有菜单项,先移除它们
+	for _, item := range keyBindingMenuItems {
+		item.Hide()
+	}
+	keyBindingMenuItems = nil
+
+	// 创建新的菜单项
+	if config != nil && len(config.KeyBindings) > 0 {
+		for _, binding := range config.KeyBindings {
+			modifierName := GetKeyName(binding.ModifierKey)
+			functionName := GetKeyName(binding.FunctionKey)
+			menuText := fmt.Sprintf("  %s+%s - %s", modifierName, functionName, binding.Description)
+			menuItem := systray.AddMenuItem(menuText, binding.Description)
+			menuItem.Disable()
+			keyBindingMenuItems = append(keyBindingMenuItems, menuItem)
+		}
+	} else {
+		// 默认显示
+		mWinJ := systray.AddMenuItem("  Win+J - 英文输入法", "切换到英文")
+		mWinJ.Disable()
+		keyBindingMenuItems = append(keyBindingMenuItems, mWinJ)
+
+		mWinK := systray.AddMenuItem("  Win+K - 中文输入法", "切换到中文")
+		mWinK.Disable()
+		keyBindingMenuItems = append(keyBindingMenuItems, mWinK)
+	}
+}
+
+// reloadConfigAndUpdateMenu 重新加载配置并更新菜单
+func reloadConfigAndUpdateMenu() {
 	err := InitConfig()
 	if err != nil {
 		ShowMessageBox("错误", fmt.Sprintf("重新加载配置失败:\n%v", err), 0x10)
@@ -320,6 +355,9 @@ func reloadConfig() {
 	// 更新托盘tooltip
 	updateTrayTooltip()
 
+	// 更新菜单项
+	updateKeyBindingMenuItems()
+
 	// 构建成功消息,显示当前所有绑定
 	message := "配置已重新加载!\n\n当前按键绑定:\n\n"
 	config := GetCurrentConfig()
@@ -331,23 +369,59 @@ func reloadConfig() {
 				i+1, modifierName, functionName, binding.Description)
 		}
 	}
-	message += "新的按键绑定已生效!\n\n"
-	message += "注意: 托盘菜单项需要重启程序才能更新,\n"
-	message += "但快捷键已立即生效。"
+	message += "新的按键绑定已立即生效!\n\n"
+	message += "托盘菜单和快捷键均已更新。"
 
 	ShowMessageBox("配置重新加载成功", message, 0x40)
 }
 
-// updateTrayTooltip 更新托盘提示信息
-func updateTrayTooltip() {
-	tooltipText := "兴宜街道红旗路输入法切换工具\n"
-	config := GetCurrentConfig()
-	if config != nil && len(config.KeyBindings) > 0 {
-		for _, binding := range config.KeyBindings {
-			modifierName := GetKeyName(binding.ModifierKey)
-			functionName := GetKeyName(binding.FunctionKey)
-			tooltipText += fmt.Sprintf("%s+%s: %s\n", modifierName, functionName, binding.Description)
-		}
+// resetConfig 重置为默认配置
+func resetConfig() {
+	// 确认对话框
+	ret := ShowMessageBoxYesNo(
+		"确认重置配置",
+		"确定要重置为默认配置吗?\n\n这将覆盖当前的 config.json 文件。\n\n默认配置:\n  Win+J - 切换到英文\n  Win+K - 切换到中文",
+		0x30, // MB_ICONWARNING
+	)
+
+	if ret != 6 { // IDYES = 6
+		return
 	}
-	systray.SetTooltip(tooltipText)
+
+	// 创建默认配置
+	defaultConfig := GetDefaultConfig()
+	err := SaveConfig(defaultConfig)
+	if err != nil {
+		ShowMessageBox("错误", fmt.Sprintf("保存默认配置失败:\n%v", err), 0x10)
+		return
+	}
+
+	// 重新加载配置
+	reloadConfigAndUpdateMenu()
+
+	ShowMessageBox("重置成功", "已重置为默认配置:\n\nWin+J - 切换到英文\nWin+K - 切换到中文", 0x40)
+}
+
+// ShowMessageBoxYesNo 显示是/否消息框
+func ShowMessageBoxYesNo(title, message string, icon uint) int {
+	user32 := syscall.NewLazyDLL("user32.dll")
+	messageBox := user32.NewProc("MessageBoxW")
+
+	titlePtr, _ := syscall.UTF16PtrFromString(title)
+	messagePtr, _ := syscall.UTF16PtrFromString(message)
+
+	// MB_YESNO = 0x4
+	ret, _, _ := messageBox.Call(
+		uintptr(0),
+		uintptr(unsafe.Pointer(messagePtr)),
+		uintptr(unsafe.Pointer(titlePtr)),
+		uintptr(icon|0x4),
+	)
+
+	return int(ret)
+}
+
+// reloadConfig 旧的重新加载函数(保留兼容性)
+func reloadConfig() {
+	reloadConfigAndUpdateMenu()
 }
