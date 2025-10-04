@@ -62,7 +62,7 @@ func CapturKeyAndIME() (uint32, uint32, string, error) {
 // ShowQuickBindingMenu 显示快速绑定菜单
 func ShowQuickBindingMenu() {
 	// 获取当前输入法
-	currentIM, err := GetCurrentInputMethod()
+	currentIMStr, err := GetCurrentInputMethod()
 	if err != nil {
 		ShowMessageBox("错误", fmt.Sprintf("获取当前输入法失败: %v", err), 0x10)
 		return
@@ -72,14 +72,14 @@ func ShowQuickBindingMenu() {
 	message := "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
 	message += "    快速绑定当前输入法\n"
 	message += "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-	message += fmt.Sprintf("✓ 当前输入法标识:\n  %s\n\n", currentIM)
+	message += fmt.Sprintf("✓ 当前输入法标识:\n  %s\n\n", currentIMStr)
 	message += "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
 	message += "配置示例 (添加到 config.json):\n\n"
 	message += "{\n"
 	message += "  \"modifier_key\": 91,\n"
 	message += "  \"function_key\": 74,\n"
-	message += fmt.Sprintf("  \"im_key\": \"%s\",\n", currentIM)
-	message += fmt.Sprintf("  \"description\": \"%s\"\n", getIMDescription(currentIM))
+	message += fmt.Sprintf("  \"im_key\": \"%s\",\n", currentIMStr)
+	message += fmt.Sprintf("  \"description\": \"%s\"\n", getIMDescription(currentIMStr))
 	message += "}\n\n"
 	message += "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
 	message += "常用键码:\n"

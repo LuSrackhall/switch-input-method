@@ -11,6 +11,12 @@
       "function_key": 75,
       "im_key": "2052",
       "description": "切换到中文输入法"
+    },
+    {
+      "modifier_key": 91,
+      "function_key": 72,
+      "im_key": "2052",
+      "description": "切换到中文输入法"
     }
   ]
 }

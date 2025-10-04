@@ -111,8 +111,26 @@ func ensureSingleInstance() bool {
 	return true
 }
 
-// GetCurrentInputMethod 获取当前输入法
+// GetCurrentInputMethod 获取当前输入法 (增强版 - 直接调用API)
 func GetCurrentInputMethod() (string, error) {
+	// 使用新的增强版 API
+	info, err := GetCurrentInputMethodInfo()
+	if err != nil {
+		// 降级到旧方法
+		return getCurrentInputMethodLegacy()
+	}
+
+	// 返回完整的 HKL 作为字符串
+	return fmt.Sprintf("0x%08X", info.HKL), nil
+}
+
+// GetCurrentInputMethodInfo 获取当前输入法的详细信息
+func GetCurrentInputMethodInfo() (*InputMethodInfo, error) {
+	return GetCurrentInputMethodEnhanced()
+}
+
+// getCurrentInputMethodLegacy 获取当前输入法 (兼容旧版本)
+func getCurrentInputMethodLegacy() (string, error) {
 	imSelectPath := getIMSelectPath()
 	cmd := exec.Command(imSelectPath)
 
@@ -138,9 +156,67 @@ func GetCurrentInputMethod() (string, error) {
 	return imKey, nil
 }
 
-// 切换输入法
-// * 1033 = 英语(美国), 2052 = 中文(中国)
+// 切换输入法 (增强版 - 支持完整HKL)
+// * 支持格式: "0x04090409", "1033", "0x0804", "2052" 等
 func switchInputIfNeeded(imkey string) {
+	// 尝试使用新的API直接切换
+	err := switchInputMethodDirect(imkey)
+	if err == nil {
+		fmt.Printf("✓ 已切换到输入法: %s\n", imkey)
+		return
+	}
+
+	// 降级到使用 im-select.exe
+	switchInputMethodLegacy(imkey)
+}
+
+// switchInputMethodDirect 直接通过 Windows API 切换输入法
+func switchInputMethodDirect(imkey string) error {
+	var hkl uintptr
+	var err error
+
+	// 解析输入法标识
+	if len(imkey) > 2 && (imkey[:2] == "0x" || imkey[:2] == "0X") {
+		// 十六进制格式: 0x04090409 或 0x0804
+		var value uint64
+		_, err = fmt.Sscanf(imkey, "0x%X", &value)
+		if err == nil {
+			hkl = uintptr(value)
+		}
+	} else {
+		// 十进制格式: 1033 或 2052
+		var value uint64
+		_, err = fmt.Sscanf(imkey, "%d", &value)
+		if err == nil {
+			// 转换为 HKL 格式 (低16位为语言ID)
+			hkl = uintptr(value)
+		}
+	}
+
+	if err != nil {
+		return fmt.Errorf("无效的输入法标识: %s", imkey)
+	}
+
+	// 调用 Windows API 切换
+	user32 := syscall.NewLazyDLL("user32.dll")
+	procActivateKeyboardLayout := user32.NewProc("ActivateKeyboardLayout")
+
+	const KLF_SETFORPROCESS = 0x00000100
+
+	ret, _, _ := procActivateKeyboardLayout.Call(
+		hkl,
+		KLF_SETFORPROCESS,
+	)
+
+	if ret == 0 {
+		return fmt.Errorf("激活键盘布局失败")
+	}
+
+	return nil
+}
+
+// switchInputMethodLegacy 使用 im-select.exe 切换输入法 (兼容旧版)
+func switchInputMethodLegacy(imkey string) {
 	// 获取im-select.exe路径 (与程序同目录)
 	imSelectPath := getIMSelectPath()
 	cmd := exec.Command(imSelectPath, imkey)
