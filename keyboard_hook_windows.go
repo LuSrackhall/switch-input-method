@@ -23,8 +23,12 @@ var (
 
 	keyboardHook      windows.Handle
 	modifierKeyStates map[uint32]bool // 修饰键状态映射
-	switchMutex       sync.Mutex
-	switchTriggered   bool // 标志：是否触发了输入法切换
+	// 当某个修饰键（尤其是 Win）被我们拦截按下后，
+	// 如果检测到非配置组合的普通按键，我们会为该修饰键启动一次“透传模式”，
+	// 通过模拟该修饰键的按下，让系统能识别诸如 Win+D/Win+V 等快捷键。
+	modifierPassthrough map[uint32]bool // 修饰键透传模式标记
+	switchMutex         sync.Mutex
+	switchTriggered     bool // 标志：是否触发了输入法切换
 )
 
 const (
@@ -115,15 +119,21 @@ func keyboardHookProc(nCode int, wParam uintptr, lParam uintptr) uintptr {
 				if modifierKeyStates == nil {
 					modifierKeyStates = make(map[uint32]bool)
 				}
+				if modifierPassthrough == nil {
+					modifierPassthrough = make(map[uint32]bool)
+				}
 				modifierKeyStates[vkCode] = true
-				switchTriggered = false // 重置切换标志
+				modifierPassthrough[vkCode] = false // 新一次按下，重置透传模式
+				switchTriggered = false             // 重置切换标志
 				fmt.Printf("修饰键 %s 按下 - 阻止传递\n", GetKeyName(vkCode))
 				return 1 // 阻止修饰键按下事件的传递
 			}
 
 			// 检测按键组合是否匹配配置
+			matched := false
 			for _, binding := range config.KeyBindings {
-				if modifierKeyStates[binding.ModifierKey] && vkCode == binding.FunctionKey {
+				// 当某修饰键处于透传模式时，不再触发切换，以免与系统快捷键冲突
+				if modifierKeyStates[binding.ModifierKey] && !modifierPassthrough[binding.ModifierKey] && vkCode == binding.FunctionKey {
 					fmt.Printf("检测到 %s+%s，切换到 %s\n",
 						GetKeyName(binding.ModifierKey),
 						GetKeyName(binding.FunctionKey),
@@ -137,9 +147,35 @@ func keyboardHookProc(nCode int, wParam uintptr, lParam uintptr) uintptr {
 						defer switchMutex.Unlock()
 						switchInputIfNeeded(imKey)
 					}()
+					matched = true
 					// 返回 1 阻止事件传递给系统
 					return 1
 				}
+			}
+
+			// 若未匹配到任何配置组合，但此时有修饰键（例如 Win）处于按下状态，
+			// 则为该修饰键启动透传模式：模拟一次该修饰键按下，让系统识别如 Win+D/Win+V。
+			if !matched && modifierKeyStates != nil {
+				for mk, pressed := range modifierKeyStates {
+					if !pressed {
+						continue
+					}
+					// 仅当还未开启透传时模拟一次按下
+					if modifierPassthrough != nil && !modifierPassthrough[mk] {
+						// 仅对 Win 键做透传是最核心的诉求，其他修饰键保持原逻辑
+						if mk == VK_LWIN || mk == VK_RWIN {
+							fmt.Printf("为 %s 启动透传模式（模拟按下），以允许系统快捷键生效\n", GetKeyName(mk))
+							procKeybd_event.Call(
+								uintptr(mk),
+								0,
+								0,
+								uintptr(SIMULATED_EVENT_MARKER),
+							)
+							modifierPassthrough[mk] = true
+						}
+					}
+				}
+				// 不返回 1，允许该普通按键事件继续传递给系统
 			}
 		}
 
@@ -148,8 +184,17 @@ func keyboardHookProc(nCode int, wParam uintptr, lParam uintptr) uintptr {
 			if _, isModifier := allModifierKeys[vkCode]; isModifier {
 				wasPressed := modifierKeyStates[vkCode]
 				triggered := switchTriggered
+				passthrough := false
+				if modifierPassthrough != nil {
+					passthrough = modifierPassthrough[vkCode]
+				}
 				if modifierKeyStates != nil {
 					modifierKeyStates[vkCode] = false
+				}
+				if modifierPassthrough != nil {
+					// 重置透传标记（稍后可能需要用它判断是否模拟弹起）
+					// 此处先读取到局部变量 passthrough，再清空标记
+					modifierPassthrough[vkCode] = false
 				}
 
 				fmt.Printf("修饰键 %s 释放 (切换操作: %v)\n", GetKeyName(vkCode), triggered)
@@ -160,9 +205,29 @@ func keyboardHookProc(nCode int, wParam uintptr, lParam uintptr) uintptr {
 					return 1 // 阻止原始释放事件传递
 				}
 
-				// 否则模拟修饰键按下和释放，以保持单独修饰键功能
+				// 未触发切换：
+				// - 若此前为 Win 开启过透传（系统已感知到 Win 被按下），此时仅模拟 Win 弹起即可；
+				// - 若未开启透传：
+				//   * 对 Win：不再模拟点按，直接阻止释放事件，避免开始菜单弹出；
+				//   * 对其它修饰键：保留原有“单键点按”的功能，仍然模拟一次按下/弹起。
 				if wasPressed {
-					fmt.Println("未触发切换操作 - 模拟修饰键事件保持功能")
+					if passthrough && (vkCode == VK_LWIN || vkCode == VK_RWIN) {
+						fmt.Println("Win 透传模式结束 - 模拟 Win 弹起")
+						procKeybd_event.Call(
+							uintptr(vkCode),
+							0,
+							uintptr(KEYEVENTF_KEYUP),
+							uintptr(SIMULATED_EVENT_MARKER),
+						)
+						return 1 // 阻止原始释放事件传递
+					}
+					if vkCode == VK_LWIN || vkCode == VK_RWIN {
+						// 未透传且未切换：完全吞掉 Win 的释放，不做任何模拟，避免开始菜单
+						fmt.Println("未触发切换且未透传 - 吞掉 Win 释放，避免开始菜单")
+						return 1
+					}
+					// 非 Win 修饰键延续旧逻辑：模拟一次点按保持单键功能
+					fmt.Println("未触发切换操作 - 模拟非 Win 修饰键点按以保持功能")
 					go simulateModifierKeyPress(vkCode) // 异步执行，避免阻塞钩子
 					return 1                            // 阻止原始释放事件传递
 				}
