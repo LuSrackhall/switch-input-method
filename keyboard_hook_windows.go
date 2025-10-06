@@ -222,9 +222,10 @@ func keyboardHookProc(nCode int, wParam uintptr, lParam uintptr) uintptr {
 						return 1 // 阻止原始释放事件传递
 					}
 					if vkCode == VK_LWIN || vkCode == VK_RWIN {
-						// 未透传且未切换：完全吞掉 Win 的释放，不做任何模拟，避免开始菜单
-						fmt.Println("未触发切换且未透传 - 吞掉 Win 释放，避免开始菜单")
-						return 1
+						// 未透传且未切换：单独按 Win - 模拟完整点按以触发开始菜单
+						fmt.Println("单独按 Win - 模拟完整点按以触发开始菜单")
+						go simulateModifierKeyPress(vkCode) // 异步执行，避免阻塞钩子
+						return 1                            // 阻止原始释放事件传递
 					}
 					// 非 Win 修饰键延续旧逻辑：模拟一次点按保持单键功能
 					fmt.Println("未触发切换操作 - 模拟非 Win 修饰键点按以保持功能")
