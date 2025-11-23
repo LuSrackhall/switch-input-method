@@ -2,7 +2,7 @@
 
 /*
  * 构建方式:
- * swiftc main.swift -o main
+ * swiftc main.swift -o main // 已弃用, 改为使用build.sh脚本
  *
  * 调试方式:
  * 1. 赋予执行权限: chmod +x main.swift
@@ -188,17 +188,42 @@ func getEventName(_ type: CGEventType) -> String {
 // 获取命令行参数
 let args = ProcessInfo.processInfo.arguments
 
-// 检查是否需要以守护进程方式运行
-// 为了方便调试，默认改为前台运行。
-// 如果需要后台运行，请使用: ./main.swift daemon
-if args.contains("daemon") {
+// 检查运行模式
+// 默认模式: 启动后台守护进程并退出
+// 调试模式: ./main.swift --debug (前台运行)
+// 内部模式: ./main.swift --daemon (后台实际运行的进程)
+
+if args.contains("--daemon") {
     // --- 子进程 (守护进程) 逻辑 ---
-    // 创建新的会话
+    // 创建新的会话，脱离控制终端
     setsid()
+    
+    // 重定向标准输入输出到 /dev/null (防止向已关闭的终端输出导致 SIGPIPE)
+    freopen("/dev/null", "r", stdin)
+    freopen("/dev/null", "w", stdout)
+    freopen("/dev/null", "w", stderr)
+    
+} else if args.contains("--debug") {
+    // --- 调试模式 (前台运行) ---
+    print("程序以调试模式启动 (PID: \(ProcessInfo.processInfo.processIdentifier))...")
+    print("日志将直接输出到终端。")
+    
 } else {
-    // --- 前台运行逻辑 ---
-    print("程序以前台模式启动 (PID: \(ProcessInfo.processInfo.processIdentifier))...")
-    print("如需后台运行，请执行: ./main.swift daemon &")
+    // --- 默认模式 (启动后台进程) ---
+    let executablePath = args[0]
+    let task = Process()
+    task.launchPath = executablePath
+    task.arguments = ["--daemon"]
+    
+    do {
+        try task.run()
+        print("✅ 程序已在后台启动 (PID: \(task.processIdentifier))")
+        print("⌨️  您可以在菜单栏找到图标进行管理")
+        exit(0)
+    } catch {
+        print("❌ 启动失败: \(error)")
+        exit(1)
+    }
 }
 
 // 初始化应用
