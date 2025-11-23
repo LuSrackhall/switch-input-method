@@ -33,28 +33,129 @@ let KEY_OPTION: UInt16 = 56
 let KEY_TARGET_1: UInt16 = 38 // J
 let KEY_TARGET_2: UInt16 = 40 // K
 
+// 默认输入法 ID
+let DEFAULT_IM_1 = "com.apple.keylayout.UnicodeHexInput"
+let DEFAULT_IM_2 = "im.rime.inputmethod.Squirrel.Hans"
+
+// 当前配置 (优先从 UserDefaults 加载)
+var targetIM1 = UserDefaults.standard.string(forKey: "TargetIM1") ?? DEFAULT_IM_1
+var targetIM2 = UserDefaults.standard.string(forKey: "TargetIM2") ?? DEFAULT_IM_2
+
 // MARK: - 辅助类与扩展
+
+struct InputSource {
+    let id: String
+    let name: String
+}
+
+func getInstalledInputSources() -> [InputSource] {
+    let properties = [kTISPropertyInputSourceCategory: kTISCategoryKeyboardInputSource] as CFDictionary
+    guard let sources = TISCreateInputSourceList(properties, false)?.takeRetainedValue() as? [TISInputSource] else {
+        return []
+    }
+    
+    var result: [InputSource] = []
+    for source in sources {
+        // 获取 ID
+        let ptrID = TISGetInputSourceProperty(source, kTISPropertyInputSourceID)
+        guard let ptrID = ptrID else { continue }
+        let id = Unmanaged<CFString>.fromOpaque(ptrID).takeUnretainedValue() as String
+        
+        // 获取名称
+        let ptrName = TISGetInputSourceProperty(source, kTISPropertyLocalizedName)
+        let name: String
+        if let ptrName = ptrName {
+            name = Unmanaged<CFString>.fromOpaque(ptrName).takeUnretainedValue() as String
+        } else {
+            name = id
+        }
+        
+        // 过滤掉一些非输入法的源 (可选)
+        result.append(InputSource(id: id, name: name))
+    }
+    return result.sorted { $0.name < $1.name }
+}
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
+    var menu: NSMenu!
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 设置托盘图标
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
-            button.title = "⌨️" // 使用字符作为图标
+            button.title = "⌨️"
             button.toolTip = "输入法切换助手"
         }
         
-        // 创建菜单
-        let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "输入法切换助手正在运行", action: nil, keyEquivalent: ""))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "退出", action: #selector(quit), keyEquivalent: "q"))
-        statusItem.menu = menu
+        buildMenu()
         
         // 启动键盘监听
         startKeyEventListen()
+    }
+    
+    func buildMenu() {
+        menu = NSMenu()
+        
+        // 标题
+        let titleItem = NSMenuItem(title: "输入法切换助手", action: nil, keyEquivalent: "")
+        titleItem.isEnabled = false
+        menu.addItem(titleItem)
+        menu.addItem(NSMenuItem.separator())
+        
+        // Option + J 设置
+        let im1Menu = NSMenu()
+        let im1Item = NSMenuItem(title: "Option + J 切换至...", action: nil, keyEquivalent: "")
+        im1Item.submenu = im1Menu
+        menu.addItem(im1Item)
+        
+        // Option + K 设置
+        let im2Menu = NSMenu()
+        let im2Item = NSMenuItem(title: "Option + K 切换至...", action: nil, keyEquivalent: "")
+        im2Item.submenu = im2Menu
+        menu.addItem(im2Item)
+        
+        // 填充子菜单
+        let sources = getInstalledInputSources()
+        
+        // 填充 Option + J 列表
+        for source in sources {
+            let item = NSMenuItem(title: source.name, action: #selector(selectIM1(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = source.id
+            if source.id == targetIM1 { item.state = .on }
+            im1Menu.addItem(item)
+        }
+        
+        // 填充 Option + K 列表
+        for source in sources {
+            let item = NSMenuItem(title: source.name, action: #selector(selectIM2(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = source.id
+            if source.id == targetIM2 { item.state = .on }
+            im2Menu.addItem(item)
+        }
+        
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "退出", action: #selector(quit), keyEquivalent: "q"))
+        
+        statusItem.menu = menu
+    }
+    
+    @objc func selectIM1(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        targetIM1 = id
+        UserDefaults.standard.set(id, forKey: "TargetIM1")
+        print("Option + J 已设置为: \(sender.title) (\(id))")
+        buildMenu() // 重建菜单以更新勾选状态
+    }
+    
+    @objc func selectIM2(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        targetIM2 = id
+        UserDefaults.standard.set(id, forKey: "TargetIM2")
+        print("Option + K 已设置为: \(sender.title) (\(id))")
+        buildMenu() // 重建菜单以更新勾选状态
     }
     
     @objc func quit() {
@@ -177,12 +278,12 @@ func eventCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent, re
             if isOptionHeld {
                 if keyCode == KEY_TARGET_1 { // J
                     DispatchQueue.global().async {
-                        switchInputIfNeeded("com.apple.keylayout.UnicodeHexInput")
+                        switchInputIfNeeded(targetIM1)
                     }
                 }
                 if keyCode == KEY_TARGET_2 { // K
                     DispatchQueue.global().async {
-                        switchInputIfNeeded("im.rime.inputmethod.Squirrel.Hans")
+                        switchInputIfNeeded(targetIM2)
                     }
                 }
             }
